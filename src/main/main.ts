@@ -1,81 +1,87 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut } from 'electron';
-import * as path from 'path';
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import { TrayManager } from './tray';
 import { OverlayManager } from './overlay';
 import { ConfigManager } from './config';
+import { AudioCaptureManager } from './audio-capture';
 import { IPC_CHANNELS, AppConfig } from '../shared/types';
 
 let mainWindow: BrowserWindow | null = null;
-let trayManager: TrayManager | null = null;
 let overlayManager: OverlayManager | null = null;
 let configManager: ConfigManager;
+let audioCapture: AudioCaptureManager;
 
 function createOverlay(config: AppConfig): void {
   overlayManager = new OverlayManager(config);
   mainWindow = overlayManager.getWindow();
-
-  // Setup IPC handlers
+  initAudioCapture();
   setupIPC();
+  new TrayManager(mainWindow);
+  registerHotkey(config.hotkey);
+  audioCapture.start();
+}
 
-  // Setup tray
-  trayManager = new TrayManager(mainWindow!);
+function initAudioCapture(): void {
+  audioCapture = new AudioCaptureManager();
+  audioCapture.setWindow(mainWindow!);
+  audioCapture.onChunk((chunk) => {
+    sendToWindow('audio-chunk', chunk);
+  });
+}
 
-  // Register global hotkey
-  if (config.hotkey) {
-    globalShortcut.register(config.hotkey, () => {
-      if (mainWindow) {
-        if (mainWindow.isVisible()) {
-          mainWindow.hide();
-        } else {
-          mainWindow.show();
-        }
-      }
-    });
+function sendToWindow(channel: string, data: any): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, data);
   }
 }
 
+function registerHotkey(hotkey: string | undefined): void {
+  if (!hotkey) return;
+  globalShortcut.register(hotkey, toggleOverlay);
+}
+
+function toggleOverlay(): void {
+  if (!mainWindow) return;
+  mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+}
+
+function reregisterHotkey(oldKey: string, newKey: string): void {
+  globalShortcut.unregisterAll();
+  registerHotkey(newKey);
+}
+
+// --- IPC Handlers ---
+
 function setupIPC(): void {
-  ipcMain.handle(IPC_CHANNELS.CONFIG_LOAD, () => {
-    return configManager.load();
-  });
+  ipcMain.handle(IPC_CHANNELS.CONFIG_LOAD, () => configManager.load());
 
-  ipcMain.handle(IPC_CHANNELS.CONFIG_SAVE, (_event, config: Partial<AppConfig>) => {
+  ipcMain.handle(IPC_CHANNELS.CONFIG_SAVE, (_e, partial: Partial<AppConfig>) => {
     const current = configManager.load();
-    const updated = { ...current, ...config };
+    const updated = { ...current, ...partial };
     configManager.save(updated);
-
-    // Re-register hotkey if changed
-    if (config.hotkey && config.hotkey !== current.hotkey) {
-      globalShortcut.unregisterAll();
-      globalShortcut.register(config.hotkey, () => {
-        if (mainWindow) {
-          if (mainWindow.isVisible()) mainWindow.hide();
-          else mainWindow.show();
-        }
-      });
+    if (partial.hotkey && partial.hotkey !== current.hotkey) {
+      reregisterHotkey(current.hotkey, partial.hotkey);
     }
-
     return updated;
   });
 
-  ipcMain.handle(IPC_CHANNELS.TOGGLE_TTS, (_event, active: boolean) => {
-    if (mainWindow) {
-      mainWindow.webContents.send(IPC_CHANNELS.TTS_STATUS, active);
-    }
+  ipcMain.handle(IPC_CHANNELS.TOGGLE_TTS, (_e, active: boolean) => {
+    sendToWindow(IPC_CHANNELS.TTS_STATUS, active);
     return active;
   });
+
+  ipcMain.handle('audio-start', () => audioCapture.start());
+  ipcMain.handle('audio-stop', () => { audioCapture.stop(); return true; });
+  ipcMain.handle('audio-list-devices', () => audioCapture.listDevices());
+  ipcMain.handle('audio-status', () => audioCapture.isRunning());
 }
 
 app.whenReady().then(() => {
   configManager = new ConfigManager();
-  const config = configManager.load();
-  createOverlay(config);
+  createOverlay(configManager.load());
 });
 
-app.on('window-all-closed', () => {
-  // Don't quit - app runs in tray
-});
-
+app.on('window-all-closed', () => { /* stay in tray */ });
 app.on('before-quit', () => {
+  audioCapture?.stop();
   globalShortcut.unregisterAll();
 });

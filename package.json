@@ -11,14 +11,21 @@
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },
-  "keywords": ["transcription", "translation", "voice-cloning", "electron"],
+  "keywords": [
+    "transcription",
+    "translation",
+    "voice-cloning",
+    "electron"
+  ],
   "author": "Pedro (Psherman42000)",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^30.0.0",
-    "typescript": "^5.5.0",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
+    "electron": "^30.0.0",
     "eslint": "^9.0.0",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.60.1"
   }
 }
