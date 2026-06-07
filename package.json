@@ -1,0 +1,24 @@
+{
+  "name": "mimico",
+  "version": "0.1.0",
+  "description": "Real-time audio transcription, translation and voice cloning for Windows",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc && cp src/renderer/index.html src/renderer/styles.css dist/renderer/",
+    "watch": "tsc -w",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --dev",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
+  },
+  "keywords": ["transcription", "translation", "voice-cloning", "electron"],
+  "author": "Pedro (Psherman42000)",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.js.map
+*.d.ts
+.env
+config.json
+voice_samples/
+logs/
+.DS_Store
+Thumbs.db
