@@ -3,22 +3,24 @@ import { TrayManager } from './tray';
 import { OverlayManager } from './overlay';
 import { ConfigManager } from './config';
 import { AudioCaptureManager } from './audio-capture';
+import { WhisperManager } from './whisper-manager';
 import { IPC_CHANNELS, AppConfig } from '../shared/types';
 
 let mainWindow: BrowserWindow | null = null;
 let overlayManager: OverlayManager | null = null;
 let configManager: ConfigManager;
 let audioCapture: AudioCaptureManager;
+let whisperManager: WhisperManager;
 
 function initializeApp(): void {
   configManager = new ConfigManager();
   const config = configManager.load();
   setupOverlay(config);
+  setupWhisper();
   setupAudioCapture();
   setupIpcHandlers();
   new TrayManager(mainWindow!);
   registerGlobalHotkey(config.hotkey);
-  audioCapture.start();
 }
 
 function setupOverlay(config: AppConfig): void {
@@ -26,12 +28,33 @@ function setupOverlay(config: AppConfig): void {
   mainWindow = overlayManager.getWindow();
 }
 
+function setupWhisper(): void {
+  whisperManager = new WhisperManager('tiny', 'en');
+  whisperManager.setWindow(mainWindow!);
+  whisperManager.onTranscription((result) => {
+    sendToWindow(IPC_CHANNELS.TRANSCRIPTION, result.text);
+    sendToWindow(IPC_CHANNELS.LATENCY, {
+      total: result.latencyMs,
+      stt: result.latencyMs,
+    });
+  });
+}
+
 function setupAudioCapture(): void {
   audioCapture = new AudioCaptureManager();
   audioCapture.setWindow(mainWindow!);
   audioCapture.onChunk((chunk) => {
-    sendToWindow('audio-chunk', chunk);
+    whisperManager.transcribeChunk(chunk.data, chunk.sampleRate);
   });
+}
+
+async function startPipelines(): Promise<void> {
+  const whisperReady = await whisperManager.start();
+  if (!whisperReady) {
+    console.error('Whisper failed to start');
+    return;
+  }
+  await audioCapture.start();
 }
 
 function registerGlobalHotkey(hotkey: string | undefined): void {
@@ -87,13 +110,19 @@ function setupIpcHandlers(): void {
   ipcMain.handle('audio-status', () => audioCapture.isRunning());
 }
 
-app.whenReady().then(initializeApp);
+app.whenReady().then(() => {
+  initializeApp();
+  startPipelines();
+});
 
 app.on('window-all-closed', () => { /* stay in tray */ });
 
 app.on('before-quit', () => {
   if (audioCapture) {
     audioCapture.stop();
+  }
+  if (whisperManager) {
+    whisperManager.stop();
   }
   globalShortcut.unregisterAll();
 });
