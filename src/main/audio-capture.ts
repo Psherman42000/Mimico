@@ -34,40 +34,32 @@ interface WorkerMessage {
   [key: string]: unknown;
 }
 
-type PendingResolver = (data: WorkerMessage) => void;
+type MessageHandler = (msg: WorkerMessage) => void;
 
 export class AudioCaptureManager {
   private process: import('child_process').ChildProcess | null = null;
   private onChunkCallback: ((chunk: AudioChunk) => void) | null = null;
   private mainWindow: BrowserWindow | null = null;
-  private pendingRequests: Map<string, PendingResolver> = new Map();
+  private pendingRequests: Map<string, MessageHandler> = new Map();
   private requestIdCounter = 0;
 
-  setWindow(window: BrowserWindow): void {
-    this.mainWindow = window;
-  }
+  setWindow(window: BrowserWindow): void { this.mainWindow = window; }
 
   // --- Process lifecycle ---
 
   async start(device?: number): Promise<boolean> {
-    if (this.process) {
-      return false;
-    }
+    if (this.process) { return false; }
     return new Promise((resolve) => {
-      this.doStart(device, resolve);
+      try {
+        this.doStart(resolve, device);
+      } catch (error) {
+        console.error('Failed to start capture:', error);
+        resolve(false);
+      }
     });
   }
 
-  private doStart(device: number | undefined, resolve: (v: boolean) => void): void {
-    try {
-      this.spawnAndListen(resolve, device);
-    } catch (error) {
-      console.error('Failed to start audio capture:', error);
-      resolve(false);
-    }
-  }
-
-  private spawnAndListen(resolve: (v: boolean) => void, device?: number): void {
+  private doStart(resolve: (v: boolean) => void, device?: number): void {
     this.spawnWorker();
     this.setupStdoutParser();
     this.setupStderr();
@@ -90,9 +82,7 @@ export class AudioCaptureManager {
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
       for (const line of lines) {
-        if (!line.trim()) {
-          continue;
-        }
+        if (!line.trim()) { continue; }
         this.tryParseJson(line);
       }
     });
@@ -102,29 +92,27 @@ export class AudioCaptureManager {
     try {
       this.handleMessage(JSON.parse(line) as WorkerMessage);
     } catch {
-      console.warn('Invalid JSON from capture worker:', line);
+      console.warn('Invalid JSON from worker:', line);
     }
   }
 
   private setupStderr(): void {
     this.process!.stderr!.on('data', (data: Buffer) => {
       const text = data.toString().trim();
-      if (text) {
-        console.error('[capture-worker]', text);
-      }
+      if (text) { console.error('[capture]', text); }
     });
   }
 
   private setupExitHandler(): void {
     this.process!.on('exit', (code) => {
-      console.log(`Capture worker exited with code ${code}`);
+      console.log(`Capture worker exited (${code})`);
       this.process = null;
     });
   }
 
   private setupErrorHandler(resolve: (v: boolean) => void): void {
     this.process!.on('error', (error) => {
-      console.error('Capture worker error:', error);
+      console.error('Worker error:', error);
       this.process = null;
       resolve(false);
     });
@@ -144,26 +132,20 @@ export class AudioCaptureManager {
   }
 
   stop(): void {
-    if (!this.process) {
-      return;
-    }
+    if (!this.process) { return; }
     this.sendCommand({ cmd: 'shutdown' });
     setTimeout(() => this.forceKill(), 2000);
   }
 
   private forceKill(): void {
-    if (!this.process) {
-      return;
-    }
+    if (!this.process) { return; }
     this.process.kill();
     this.process = null;
   }
 
-  isRunning(): boolean {
-    return this.process !== null;
-  }
+  isRunning(): boolean { return this.process !== null; }
 
-  // --- API requests ---
+  // --- API ---
 
   listDevices(): Promise<AudioDevice[]> {
     return this.sendRequest('list_devices_', { cmd: 'list_devices' }).then(
@@ -174,14 +156,8 @@ export class AudioCaptureManager {
   getBuffer(duration = 5.0): Promise<AudioChunk | null> {
     return this.sendRequest('get_buffer_', { cmd: 'get_buffer', duration }).then(
       (data) => {
-        if (!data) {
-          return null;
-        }
-        return {
-          data: data.data as string,
-          sampleRate: data.sample_rate as number,
-          duration: data.duration as number,
-        };
+        if (!data) { return null; }
+        return { data: data.data as string, sampleRate: data.sample_rate as number, duration: data.duration as number };
       },
     );
   }
@@ -191,21 +167,15 @@ export class AudioCaptureManager {
       const requestId = `${prefix}${++this.requestIdCounter}`;
       this.pendingRequests.set(requestId, resolve);
       this.sendCommand({ ...command, request_id: requestId });
-      setTimeout(() => {
-        this.pendingRequests.delete(requestId);
-        resolve(null);
-      }, 3000);
+      setTimeout(() => { this.pendingRequests.delete(requestId); resolve(null); }, 3000);
     });
   }
 
-  onChunk(callback: (chunk: AudioChunk) => void): void {
-    this.onChunkCallback = callback;
-  }
+  onChunk(callback: (chunk: AudioChunk) => void): void { this.onChunkCallback = callback; }
 
   private sendCommand(command: object): void {
     if (this.process?.stdin) {
-      const json = `${JSON.stringify(command)}\n`;
-      this.process.stdin.write(json);
+      this.process.stdin.write(`${JSON.stringify(command)}\n`);
     }
   }
 
@@ -213,20 +183,18 @@ export class AudioCaptureManager {
 
   private handleMessage(message: WorkerMessage): void {
     const handler = this.routeMessage(message.event);
-    if (handler) {
-      handler(message);
-    }
+    if (handler) { handler(message); }
   }
 
-  private routeMessage(event: string): PendingResolver | null {
-    const routes: Record<string, (msg: WorkerMessage) => void> = {
-      audio_chunk: (msg) => this.handleAudioChunk(msg),
-      device_list: (msg) => this.resolveRequest(msg, 'list_devices_'),
-      buffer_data: (msg) => this.resolveRequest(msg, 'get_buffer_'),
-      vad_active: (msg) => this.sendToWindow('vad-status', msg.active),
-      status: (msg) => this.sendToWindow('capture-status', msg.state),
-      error: (msg) => console.error('[capture]', msg.message),
-      warning: (msg) => console.warn('[capture]', msg.message),
+  private routeMessage(event: string): MessageHandler | null {
+    const routes: Record<string, MessageHandler> = {
+      audio_chunk:  (msg) => this.handleAudioChunk(msg),
+      device_list:  (msg) => this.resolveRequest(msg, 'list_devices_'),
+      buffer_data:  (msg) => this.resolveRequest(msg, 'get_buffer_'),
+      vad_active:   (msg) => this.sendToWindow('vad-status', msg.active),
+      status:       (msg) => this.sendToWindow('capture-status', msg.state),
+      error:        (msg) => console.error('[capture]', msg.message),
+      warning:      (msg) => console.warn('[capture]', msg.message),
     };
     return routes[event] ?? null;
   }
@@ -260,24 +228,18 @@ export class AudioCaptureManager {
   // --- Utilities ---
 
   private resolvePython(): string {
-    const candidates = ['python', 'python3', 'py'];
-    const found = candidates.find((command) => {
-      try {
-        const output = execSync(`${command} --version`, { encoding: 'utf-8' });
-        return output.includes('Python');
-      } catch {
-        return false;
-      }
+    const found = ['python', 'python3', 'py'].find((command) => {
+      try { return execSync(`${command} --version`, { encoding: 'utf-8' }).includes('Python'); }
+      catch { return false; }
     });
     return found || 'python';
   }
 
   private resolveWorkerPath(): string {
-    const candidates = [
+    const found = [
       path.join(__dirname, '../../workers/audio_capture.py'),
       path.join(process.cwd(), 'workers', 'audio_capture.py'),
-    ];
-    const found = candidates.find((filePath) => fs.existsSync(filePath));
-    return found || candidates[0];
+    ].find((filePath) => fs.existsSync(filePath));
+    return found || path.join(__dirname, '../../workers/audio_capture.py');
   }
 }

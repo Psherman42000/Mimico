@@ -4,6 +4,7 @@ import { OverlayManager } from './overlay';
 import { ConfigManager } from './config';
 import { AudioCaptureManager } from './audio-capture';
 import { WhisperManager } from './whisper-manager';
+import { TranslatorService } from './translator';
 import { IPC_CHANNELS, AppConfig } from '../shared/types';
 
 let mainWindow: BrowserWindow | null = null;
@@ -11,11 +12,13 @@ let overlayManager: OverlayManager | null = null;
 let configManager: ConfigManager;
 let audioCapture: AudioCaptureManager;
 let whisperManager: WhisperManager;
+let translator: TranslatorService;
 
 function initializeApp(): void {
   configManager = new ConfigManager();
   const config = configManager.load();
   setupOverlay(config);
+  setupTranslator(config);
   setupWhisper();
   setupAudioCapture();
   setupIpcHandlers();
@@ -28,15 +31,33 @@ function setupOverlay(config: AppConfig): void {
   mainWindow = overlayManager.getWindow();
 }
 
+function setupTranslator(config: AppConfig): void {
+  translator = new TranslatorService();
+  translator.setWindow(mainWindow!);
+  if (config.deepLKey) {
+    translator.setApiKey(config.deepLKey);
+  }
+}
+
 function setupWhisper(): void {
   whisperManager = new WhisperManager('tiny', 'en');
   whisperManager.setWindow(mainWindow!);
-  whisperManager.onTranscription((result) => {
+  whisperManager.onTranscription(async (result) => {
+    // Send original transcription to overlay
     sendToWindow(IPC_CHANNELS.TRANSCRIPTION, result.text);
     sendToWindow(IPC_CHANNELS.LATENCY, {
       total: result.latencyMs,
       stt: result.latencyMs,
     });
+
+    // Translate if we have an API key
+    if (translator.isConfigured()) {
+      const translation = await translator.translate(result.text);
+      sendToWindow(IPC_CHANNELS.TRANSLATION, {
+        original: result.text,
+        translated: translation.translated,
+      });
+    }
   });
 }
 
@@ -89,6 +110,13 @@ function setupIpcHandlers(): void {
     const current = configManager.load();
     const updated = { ...current, ...partial };
     configManager.save(updated);
+
+    // Reconfigure translator if key changed
+    if (partial.deepLKey && partial.deepLKey !== current.deepLKey) {
+      translator.setApiKey(partial.deepLKey);
+    }
+
+    // Re-register hotkey if changed
     if (partial.hotkey && partial.hotkey !== current.hotkey) {
       globalShortcut.unregisterAll();
       registerGlobalHotkey(partial.hotkey);
@@ -101,6 +129,7 @@ function setupIpcHandlers(): void {
     return active;
   });
 
+  // Audio controls
   ipcMain.handle('audio-start', () => audioCapture.start());
   ipcMain.handle('audio-stop', () => {
     audioCapture.stop();
@@ -108,6 +137,13 @@ function setupIpcHandlers(): void {
   });
   ipcMain.handle('audio-list-devices', () => audioCapture.listDevices());
   ipcMain.handle('audio-status', () => audioCapture.isRunning());
+
+  // Translator info
+  ipcMain.handle('translator-status', () => ({
+    configured: translator.isConfigured(),
+    usage: translator.getMonthlyUsage(),
+    limit: translator.getMonthlyLimit(),
+  }));
 }
 
 app.whenReady().then(() => {
@@ -118,11 +154,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => { /* stay in tray */ });
 
 app.on('before-quit', () => {
-  if (audioCapture) {
-    audioCapture.stop();
-  }
-  if (whisperManager) {
-    whisperManager.stop();
-  }
+  audioCapture?.stop();
+  whisperManager?.stop();
   globalShortcut.unregisterAll();
 });

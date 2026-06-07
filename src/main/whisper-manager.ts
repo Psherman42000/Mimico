@@ -30,21 +30,24 @@ interface WhisperMessage {
   compute_type?: string;
   load_time_ms?: number;
   capabilities?: { gpu: boolean; model: string };
+  request_id?: string;
+  name?: string;
+  vram_gb?: number;
   [key: string]: unknown;
 }
 
-type TranscribeCallback = (result: TranscriptionResult) => void;
+type MessageHandler = (msg: WhisperMessage) => void;
 type StatusCallback = (status: string) => void;
 
 export class WhisperManager {
   private process: import('child_process').ChildProcess | null = null;
   private mainWindow: BrowserWindow | null = null;
-  private onTranscribe: TranscribeCallback | null = null;
+  private onTranscribe: ((result: TranscriptionResult) => void) | null = null;
   private onStatus: StatusCallback | null = null;
   private modelLoaded = false;
   private currentModel: string;
   private currentLanguage: string;
-  private pendingTranscriptions: Map<string, TranscribeCallback> = new Map();
+  private pendingTranscriptions: Map<string, (result: TranscriptionResult) => void> = new Map();
   private requestCounter = 0;
 
   constructor(modelSize = 'tiny', language = 'en') {
@@ -52,17 +55,9 @@ export class WhisperManager {
     this.currentLanguage = language;
   }
 
-  setWindow(window: BrowserWindow): void {
-    this.mainWindow = window;
-  }
-
-  onTranscription(callback: TranscribeCallback): void {
-    this.onTranscribe = callback;
-  }
-
-  onStatusChange(callback: StatusCallback): void {
-    this.onStatus = callback;
-  }
+  setWindow(window: BrowserWindow): void { this.mainWindow = window; }
+  onTranscription(callback: (result: TranscriptionResult) => void): void { this.onTranscribe = callback; }
+  onStatusChange(callback: StatusCallback): void { this.onStatus = callback; }
 
   // --- Lifecycle ---
 
@@ -76,23 +71,27 @@ export class WhisperManager {
   private spawnWorker(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
-        const workerPath = this.resolveWorkerPath();
-        const pythonCmd = this.resolvePython();
-
-        this.process = spawn(pythonCmd, [workerPath], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          windowsHide: true,
-        });
-
-        this.setupStdoutParser();
-        this.setupStderr();
-        this.setupExitHandler();
-        this.waitForReady(resolve);
+        this.doStart(resolve);
       } catch (error) {
-        console.error('Failed to start Whisper worker:', error);
+        console.error('Failed to start Whisper:', error);
         resolve(false);
       }
     });
+  }
+
+  private doStart(resolve: (v: boolean) => void): void {
+    const workerPath = this.resolveWorkerPath();
+    const pythonCmd = this.resolvePython();
+
+    this.process = spawn(pythonCmd, [workerPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    this.setupStdoutParser();
+    this.setupStderr();
+    this.setupExitHandler();
+    this.waitForReady(resolve);
   }
 
   private setupStdoutParser(): void {
@@ -102,9 +101,7 @@ export class WhisperManager {
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
       for (const line of lines) {
-        if (!line.trim()) {
-          continue;
-        }
+        if (!line.trim()) { continue; }
         this.tryParseMessage(line);
       }
     });
@@ -121,9 +118,7 @@ export class WhisperManager {
   private setupStderr(): void {
     this.process!.stderr!.on('data', (data: Buffer) => {
       const text = data.toString().trim();
-      if (text) {
-        console.error('[whisper]', text);
-      }
+      if (text) { console.error('[whisper]', text); }
     });
   }
 
@@ -136,16 +131,12 @@ export class WhisperManager {
   }
 
   private waitForReady(resolve: (v: boolean) => void): void {
-    const timeout = setTimeout(() => resolve(false), 30000); // model download can take long
+    const timeout = setTimeout(() => resolve(false), 30000);
     const originalHandler = this.handleMessage.bind(this);
     this.handleMessage = (message: WhisperMessage) => {
       if (message.event === 'ready') {
         clearTimeout(timeout);
-        // Auto-load model
-        this.sendCommand({
-          cmd: 'load_model',
-          size: this.currentModel,
-        });
+        this.sendCommand({ cmd: 'load_model', size: this.currentModel });
         resolve(true);
       } else if (message.event === 'model_loaded') {
         this.modelLoaded = true;
@@ -158,22 +149,19 @@ export class WhisperManager {
   }
 
   stop(): void {
-    if (!this.process) {
-      return;
-    }
+    if (!this.process) { return; }
     this.sendCommand({ cmd: 'shutdown' });
-    setTimeout(() => {
-      if (this.process) {
-        this.process.kill();
-        this.process = null;
-        this.modelLoaded = false;
-      }
-    }, 2000);
+    setTimeout(() => this.forceKill(), 2000);
   }
 
-  isReady(): boolean {
-    return this.modelLoaded;
+  private forceKill(): void {
+    if (!this.process) { return; }
+    this.process.kill();
+    this.process = null;
+    this.modelLoaded = false;
   }
+
+  isReady(): boolean { return this.modelLoaded; }
 
   // --- Transcription ---
 
@@ -185,11 +173,8 @@ export class WhisperManager {
 
     const requestId = `tr_${++this.requestCounter}`;
 
-    // Store pending callback
     this.pendingTranscriptions.set(requestId, (result) => {
-      if (this.onTranscribe) {
-        this.onTranscribe(result);
-      }
+      if (this.onTranscribe) { this.onTranscribe(result); }
       this.sendToWindow('transcription', {
         text: result.text,
         language: result.language,
@@ -205,10 +190,7 @@ export class WhisperManager {
       language: this.currentLanguage,
     });
 
-    // Timeout safety
-    setTimeout(() => {
-      this.pendingTranscriptions.delete(requestId);
-    }, 30000);
+    setTimeout(() => { this.pendingTranscriptions.delete(requestId); }, 30000);
   }
 
   setLanguage(language: string): void {
@@ -225,31 +207,22 @@ export class WhisperManager {
   // --- Message handling ---
 
   private handleMessage(message: WhisperMessage): void {
-    switch (message.event) {
-      case 'ready':
-      case 'model_loaded':
-        break; // handled in waitForReady
-      case 'transcription':
-        this.handleTranscriptionResult(message);
-        break;
-      case 'gpu_info':
-        console.log('[whisper] GPU:', message.name, `(${message.vram_gb}GB)`);
-        break;
-      case 'language_set':
-        break;
-      case 'error':
-        console.error('[whisper]', message.message);
-        break;
-      case 'shutdown':
-        break;
-    }
+    const handler = this.routeMessage(message.event);
+    if (handler) { handler(message); }
+  }
+
+  private routeMessage(event: string): MessageHandler | null {
+    const routes: Record<string, MessageHandler> = {
+      transcription: (msg) => this.handleTranscriptionResult(msg),
+      gpu_info: (msg) => console.log('[whisper] GPU:', msg.name, `(${msg.vram_gb}GB)`),
+      error: (msg) => console.error('[whisper]', msg.message),
+    };
+    return routes[event] ?? null;
   }
 
   private handleTranscriptionResult(message: WhisperMessage): void {
-    const requestId = message.request_id as string;
-    const callback = requestId
-      ? this.pendingTranscriptions.get(requestId)
-      : null;
+    const requestId = message.request_id || '';
+    const callback = requestId ? this.pendingTranscriptions.get(requestId) : null;
 
     const result: TranscriptionResult = {
       text: (message.text || '').trim(),
@@ -284,24 +257,19 @@ export class WhisperManager {
   // --- Utilities ---
 
   private resolvePython(): string {
-    const candidates = ['python', 'python3', 'py'];
-    const found = candidates.find((command) => {
+    const found = ['python', 'python3', 'py'].find((command) => {
       try {
-        const output = execSync(`${command} --version`, { encoding: 'utf-8' });
-        return output.includes('Python');
-      } catch {
-        return false;
-      }
+        return execSync(`${command} --version`, { encoding: 'utf-8' }).includes('Python');
+      } catch { return false; }
     });
     return found || 'python';
   }
 
   private resolveWorkerPath(): string {
-    const candidates = [
+    const found = [
       path.join(__dirname, '../../workers/whisper_worker.py'),
       path.join(process.cwd(), 'workers', 'whisper_worker.py'),
-    ];
-    const found = candidates.find((filePath) => fs.existsSync(filePath));
-    return found || candidates[0];
+    ].find((filePath) => fs.existsSync(filePath));
+    return found || path.join(__dirname, '../../workers/whisper_worker.py');
   }
 }
