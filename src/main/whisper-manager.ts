@@ -206,14 +206,15 @@ export class WhisperManager extends EventEmitter {
   /**
    * Envia um chunk de áudio para transcrição.
    *
-   * O áudio é codificado em base64 e enviado como mensagem JSON
-   * para o processo Python via stdin.
+  /**
+   * Envia um chunk de áudio para transcrição pelo worker Python.
    *
    * @param audioChunk - Buffer com áudio PCM 16-bit mono 16000Hz
+   * @param language - Idioma opcional (ex: 'pt', 'en'). Auto-detect se omitido.
    * @returns Promise com o texto transcrito
    * @throws Se o worker não estiver pronto
    */
-  transcribe(audioChunk: Buffer): Promise<string> {
+  transcribe(audioChunk: Buffer, language?: string): Promise<string> {
     if (!this.ready || !this.process?.stdin) {
       return Promise.reject(new Error('Whisper worker is not ready'));
     }
@@ -221,11 +222,15 @@ export class WhisperManager extends EventEmitter {
     const id = ++this.requestId;
     const audioBase64 = audioChunk.toString('base64');
 
-    const message = JSON.stringify({
+    const messageObj: Record<string, unknown> = {
       action: 'transcribe',
       audio: audioBase64,
       id,
-    });
+    };
+    if (language) {
+      messageObj.language = language;
+    }
+    const message = JSON.stringify(messageObj);
 
     return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {

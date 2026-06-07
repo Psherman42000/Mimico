@@ -22,6 +22,7 @@ import { existsSync } from 'fs';
 // Importações dos módulos do Mimico
 import { loadConfig, saveConfig, Config } from './config';
 import { AudioCapture } from './audio-capture';
+import { MicCapture } from './mic-capture';
 import { WhisperManager } from './whisper-manager';
 import { Translator } from './translator';
 import { VoiceManager } from './voice-manager';
@@ -82,6 +83,9 @@ let config: Config;
 /** Gerenciador de captura de áudio WASAPI */
 let audioCapture: AudioCapture;
 
+/** Gerenciador de captura do microfone (Pipeline B) */
+let micCapture: MicCapture;
+
 /** Gerenciador de transcrição Faster-Whisper */
 let whisperManager: WhisperManager;
 
@@ -113,12 +117,18 @@ let isQuitting = false;
 /**
  * Inicia o pipeline de processamento de áudio.
  *
- * Fluxo:
- * 1. AudioCapture captura chunk WASAPI loopback
+ * Pipeline A (sempre ativo):
+ * 1. AudioCapture captura chunk WASAPI loopback (áudio do sistema)
  * 2. WhisperManager transcreve chunk -> texto EN
  * 3. Translator traduz EN -> PT
  * 4. Overlay atualiza com EN + PT
- * 5. Se toggleVoice ON: VoiceManager sintetiza PT -> áudio VB-Cable
+ *
+ * Pipeline B (se toggleVoice ON):
+ * 1. MicCapture captura áudio do microfone (sua voz PT)
+ * 2. WhisperManager transcreve -> texto PT
+ * 3. Translator traduz PT -> EN
+ * 4. VoiceManager sintetiza EN -> áudio
+ * 5. AudioOutput reproduz no VB-Cable
  */
 async function startPipeline(): Promise<void> {
   if (isPipelineActive) return;
@@ -140,6 +150,10 @@ async function startPipeline(): Promise<void> {
       audioOutput.start().catch((err: Error) => {
         appLog(`Failed to start audio output: ${err.message}`);
       });
+      // Inicia captura do microfone (Pipeline B)
+      micCapture.start().catch((err: Error) => {
+        appLog(`Failed to start mic capture: ${err.message}`);
+      });
     }
 
     isPipelineActive = true;
@@ -160,6 +174,7 @@ function stopPipeline(): void {
   if (!isPipelineActive) return;
 
   audioCapture.stop();
+  micCapture.stop();
   whisperManager.stop();
   audioOutput.stop();
   overlay.clearText();
@@ -233,6 +248,41 @@ function processAudioChunk(chunk: Buffer): void {
     });
 }
 
+/**
+ * Processa um chunk de áudio do microfone: transcreve PT, traduz EN, sintetiza voz.
+ *
+ * Pipeline B: sua voz PT → Whisper PT → DeepL PT→EN → Edge TTS EN → VB-Cable
+ *
+ * @param chunk - Buffer PCM 16-bit mono 16000Hz do microfone
+ */
+function processMicAudioChunk(chunk: Buffer): void {
+  if (!isPipelineActive || !config.toggleVoice) return;
+
+  whisperManager.transcribe(chunk, 'pt')
+    .then((ptText: string) => {
+      if (!ptText || ptText.trim().length === 0) return;
+
+      const cleanText = ptText.startsWith('[') ? ptText : ptText;
+
+      // Traduz PT -> EN
+      return translator.translate(cleanText, 'PT', 'EN')
+        .then((enText: string) => {
+          if (enText.startsWith('[')) return;
+
+          appLog(`[Mic] PT→EN: "${cleanText.slice(0, 40)}..." → "${enText.slice(0, 40)}..."`);
+
+          // Sintetiza voz em inglês
+          voiceManager.speakText(enText, 'en-US')
+            .catch((err: Error) => {
+              appLog(`[Mic] TTS error: ${err.message}`);
+            });
+        });
+    })
+    .catch((error: Error) => {
+      appLog(`[Mic] Transcription skipped: ${error.message}`);
+    });
+}
+
 // ============================================================
 // Handlers IPC
 // ============================================================
@@ -289,14 +339,18 @@ function applyConfigChanges(): void {
   // Atualiza chave da API DeepL
   translator.setApiKey(config.deepKey);
 
-  // Se toggle voz mudou, inicia/para audio output
+  // Se toggle voz mudou, inicia/para audio output + mic capture
   if (isPipelineActive) {
     if (config.toggleVoice) {
       audioOutput.start().catch((err: Error) => {
         appLog(`Failed to start audio output: ${err.message}`);
       });
+      micCapture.start().catch((err: Error) => {
+        appLog(`Failed to start mic capture: ${err.message}`);
+      });
     } else {
       audioOutput.stop();
+      micCapture.stop();
     }
   }
 }
@@ -362,6 +416,7 @@ function initializeModules(): void {
 
   // Cria módulos
   audioCapture = new AudioCapture();
+  micCapture = new MicCapture();
   whisperManager = new WhisperManager();
   translator = new Translator(config.deepKey);
   voiceManager = new VoiceManager('cli');
@@ -396,6 +451,19 @@ function setupModuleListeners(): void {
     if (isPipelineActive) {
       stopPipeline();
     }
+  });
+
+  // MicCapture -> Pipeline B
+  micCapture.on('data', (chunk: Buffer) => {
+    processMicAudioChunk(chunk);
+  });
+
+  micCapture.on('error', (error: Error) => {
+    appLog(`Mic capture error: ${error.message}`);
+  });
+
+  micCapture.on('exit', (code, signal) => {
+    appLog(`Mic capture exited (code: ${code}, signal: ${signal})`);
   });
 
   // WhisperManager eventos
@@ -570,6 +638,7 @@ function cleanup(): void {
   trayManager?.destroy();
   overlay?.dispose();
   audioCapture?.dispose();
+  micCapture?.dispose();
   whisperManager?.dispose();
   translator?.dispose();
   voiceManager?.dispose();
