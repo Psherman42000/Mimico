@@ -1,12 +1,12 @@
 /** Mimico Overlay Renderer */
 
 import '../shared/window-api';
+import { AppConfig } from '../shared/types';
 
 // DOM Elements
 const originalContent = document.getElementById('original-content')!;
 const translatedContent = document.getElementById('translated-content')!;
 const statusIndicator = document.getElementById('status-indicator')!;
-const listeningMode = document.getElementById('listening-mode')!;
 const btnTTS = document.getElementById('btn-tts')!;
 const ttsLabel = document.getElementById('tts-label')!;
 const btnClose = document.getElementById('btn-close')!;
@@ -29,23 +29,24 @@ const btnTestLatency = document.getElementById('btn-test-latency')!;
 
 // State
 let ttsActive = false;
-let currentConfig: any = {};
+let currentConfig: AppConfig | null = null;
 
-// Load config on startup
-async function init() {
+async function init(): Promise<void> {
   currentConfig = await window.mimico.loadConfig();
   populateSettings(currentConfig);
+  registerListeners();
+}
 
-  // Setup IPC listeners
+function registerListeners(): void {
   window.mimico.onTranscription((text: string) => {
     originalContent.textContent = text;
-    statusIndicator.style.background = '#fbbf24'; // yellow while transcribing
+    statusIndicator.style.background = '#fbbf24';
   });
 
-  window.mimico.onTranslation((data: { original: string; translated: string }) => {
+  window.mimico.onTranslation((data) => {
     originalContent.textContent = data.original;
     translatedContent.textContent = data.translated;
-    statusIndicator.style.background = '#4ade80'; // green - done
+    statusIndicator.style.background = '#4ade80';
   });
 
   window.mimico.onTTSStatus((active: boolean) => {
@@ -53,31 +54,30 @@ async function init() {
     updateTTSButton();
   });
 
-  window.mimico.onLatency((latency: any) => {
+  window.mimico.onLatency((latency) => {
     latencyMs.textContent = `${latency.total}ms`;
     latencyBar.classList.remove('hidden');
   });
 
-  window.mimico.onOpenSettings(() => {
-    openSettings();
-  });
+  window.mimico.onOpenSettings(openSettings);
 
-  // Position save
-  window.mimico.onPositionChanged((pos: { x: number; y: number }) => {
-    currentConfig.overlayPosition = pos;
-    // Auto-save position
-    window.mimico.saveConfig({ overlayPosition: pos });
+  window.mimico.onPositionChanged((pos) => {
+    if (currentConfig) {
+      currentConfig.overlayPosition = pos;
+      window.mimico.saveConfig({ overlayPosition: pos });
+    }
   });
 }
 
-// TTS Toggle
+// --- TTS Toggle ---
+
 btnTTS.addEventListener('click', async () => {
   ttsActive = !ttsActive;
   await window.mimico.toggleTTS(ttsActive);
   updateTTSButton();
 });
 
-function updateTTSButton() {
+function updateTTSButton(): void {
   if (ttsActive) {
     btnTTS.classList.remove('inactive');
     btnTTS.classList.add('active');
@@ -89,17 +89,18 @@ function updateTTSButton() {
   }
 }
 
-// Close overlay
-btnClose.addEventListener('click', () => {
-  window.close();
-});
+// --- Overlay controls ---
 
-// Settings panel
+btnClose.addEventListener('click', () => window.close());
+
+// --- Settings ---
+
 btnSettings.addEventListener('click', openSettings);
 
-function openSettings() {
-  const config = currentConfig;
-  populateSettings(config);
+function openSettings(): void {
+  if (currentConfig) {
+    populateSettings(currentConfig);
+  }
   settingsPanel.classList.remove('hidden');
 }
 
@@ -107,16 +108,16 @@ btnCloseSettings.addEventListener('click', () => {
   settingsPanel.classList.add('hidden');
 });
 
-// TTS mode toggle -> show/hide provider and api key fields
-selectTTSMode.addEventListener('change', () => {
-  const isAPI = selectTTSMode.value === 'api';
-  providerGroup.style.display = isAPI ? 'block' : 'none';
-  apiKeyGroup.style.display = isAPI ? 'block' : 'none';
-});
+selectTTSMode.addEventListener('change', toggleProviderFields);
 
-// Save settings
+function toggleProviderFields(): void {
+  const isApiMode = selectTTSMode.value === 'api';
+  providerGroup.style.display = isApiMode ? 'block' : 'none';
+  apiKeyGroup.style.display = isApiMode ? 'block' : 'none';
+}
+
 btnSaveSettings.addEventListener('click', async () => {
-  const config = {
+  const config: Partial<AppConfig> = {
     deepLKey: inputDeepLKey.value,
     ttsMode: selectTTSMode.value as 'local' | 'api',
     ttsProvider: selectTTSProvider.value as 'cartesia' | 'fish' | 'openai',
@@ -129,33 +130,26 @@ btnSaveSettings.addEventListener('click', async () => {
   settingsPanel.classList.add('hidden');
 });
 
-// Record voice
 btnRecordVoice.addEventListener('click', () => {
-  // TODO: Fase 5 - implement voice recording
-  alert('Funcionalidade de gravação será implementada em breve!');
+  alert('Gravação de voz será implementada em breve!');
 });
 
-// Test latency
 btnTestLatency.addEventListener('click', () => {
-  // TODO: Implement latency test
   alert('Teste de latência será implementado em breve!');
 });
 
-// Populate settings from config
-function populateSettings(config: any) {
+// --- Helpers ---
+
+function populateSettings(config: AppConfig): void {
   inputDeepLKey.value = config.deepLKey || '';
   selectTTSMode.value = config.ttsMode || 'local';
   selectTTSProvider.value = config.ttsProvider || 'cartesia';
   inputTTSKey.value = config.ttsApiKey || '';
   inputHotkey.value = config.hotkey || 'Ctrl+Shift+M';
-  inputOpacity.value = config.overlayOpacity ?? 0.85;
-
-  const isAPI = selectTTSMode.value === 'api';
-  providerGroup.style.display = isAPI ? 'block' : 'none';
-  apiKeyGroup.style.display = isAPI ? 'block' : 'none';
+  inputOpacity.value = String(config.overlayOpacity ?? 0.85);
+  toggleProviderFields();
 }
 
-// Start
 init();
 
 export {};

@@ -3,7 +3,7 @@
  * Comunicação via stdin/stdout com o worker audio_capture.py
  */
 
-import { ChildProcess, spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { BrowserWindow } from 'electron';
@@ -22,21 +22,37 @@ interface AudioDevice {
   isLoopback: boolean;
 }
 
-type MsgHandler = (msg: any) => void;
+interface WorkerMessage {
+  event: string;
+  data?: string;
+  sample_rate?: number;
+  duration?: number;
+  devices?: AudioDevice[];
+  message?: string;
+  active?: boolean;
+  state?: string;
+  [key: string]: unknown;
+}
+
+type PendingResolver = (data: WorkerMessage) => void;
 
 export class AudioCaptureManager {
-  private process: ChildProcess | null = null;
+  private process: import('child_process').ChildProcess | null = null;
   private onChunkCallback: ((chunk: AudioChunk) => void) | null = null;
   private mainWindow: BrowserWindow | null = null;
-  private pendingRequests: Map<string, MsgHandler> = new Map();
+  private pendingRequests: Map<string, PendingResolver> = new Map();
   private requestIdCounter = 0;
 
-  setWindow(win: BrowserWindow): void { this.mainWindow = win; }
+  setWindow(window: BrowserWindow): void {
+    this.mainWindow = window;
+  }
 
-  // --- Controle do processo ---
+  // --- Process lifecycle ---
 
   async start(device?: number): Promise<boolean> {
-    if (this.process) return false;
+    if (this.process) {
+      return false;
+    }
     return new Promise((resolve) => {
       this.doStart(device, resolve);
     });
@@ -45,8 +61,8 @@ export class AudioCaptureManager {
   private doStart(device: number | undefined, resolve: (v: boolean) => void): void {
     try {
       this.spawnAndListen(resolve, device);
-    } catch (err) {
-      console.error('Failed to start:', err);
+    } catch (error) {
+      console.error('Failed to start audio capture:', error);
       resolve(false);
     }
   }
@@ -61,42 +77,54 @@ export class AudioCaptureManager {
   }
 
   private spawnWorker(): void {
-    this.process = spawn(this.findPython(), [this.getWorkerPath()], {
+    this.process = spawn(this.resolvePython(), [this.resolveWorkerPath()], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
   }
 
   private setupStdoutParser(): void {
-    let buf = '';
+    let buffer = '';
     this.process!.stdout!.on('data', (data: Buffer) => {
-      buf += data.toString('utf-8');
-      const lines = buf.split('\n');
-      buf = lines.pop() || '';
+      buffer += data.toString('utf-8');
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
       for (const line of lines) {
-        if (!line.trim()) continue;
-        try { this.handleMessage(JSON.parse(line)); }
-        catch { console.warn('Invalid JSON:', line); }
+        if (!line.trim()) {
+          continue;
+        }
+        this.tryParseJson(line);
       }
     });
   }
 
+  private tryParseJson(line: string): void {
+    try {
+      this.handleMessage(JSON.parse(line) as WorkerMessage);
+    } catch {
+      console.warn('Invalid JSON from capture worker:', line);
+    }
+  }
+
   private setupStderr(): void {
     this.process!.stderr!.on('data', (data: Buffer) => {
-      console.error(`[capture] ${data.toString().trim()}`);
+      const text = data.toString().trim();
+      if (text) {
+        console.error('[capture-worker]', text);
+      }
     });
   }
 
   private setupExitHandler(): void {
     this.process!.on('exit', (code) => {
-      console.log(`Capture worker exited (${code})`);
+      console.log(`Capture worker exited with code ${code}`);
       this.process = null;
     });
   }
 
   private setupErrorHandler(resolve: (v: boolean) => void): void {
-    this.process!.on('error', (err) => {
-      console.error('Worker error:', err);
+    this.process!.on('error', (error) => {
+      console.error('Capture worker error:', error);
       this.process = null;
       resolve(false);
     });
@@ -104,25 +132,29 @@ export class AudioCaptureManager {
 
   private waitForReady(resolve: (v: boolean) => void, device?: number): void {
     const timeout = setTimeout(() => resolve(false), 5000);
-    const onMsg = (msg: any) => {
-      if (msg.event !== 'ready') return;
-      clearTimeout(timeout);
-      this.sendCommand({ cmd: 'start', device });
-      resolve(true);
+    const originalHandler = this.handleMessage.bind(this);
+    this.handleMessage = (message: WorkerMessage) => {
+      if (message.event === 'ready') {
+        clearTimeout(timeout);
+        this.sendCommand({ cmd: 'start', device });
+        resolve(true);
+      }
+      originalHandler(message);
     };
-    // Wrap the main handleMessage to intercept the ready event
-    const orig = this.handleMessage.bind(this);
-    this.handleMessage = (msg: any) => { onMsg(msg); orig(msg); };
   }
 
   stop(): void {
-    if (!this.process) return;
+    if (!this.process) {
+      return;
+    }
     this.sendCommand({ cmd: 'shutdown' });
-    setTimeout(() => this.killProcess(), 2000);
+    setTimeout(() => this.forceKill(), 2000);
   }
 
-  private killProcess(): void {
-    if (!this.process) return;
+  private forceKill(): void {
+    if (!this.process) {
+      return;
+    }
     this.process.kill();
     this.process = null;
   }
@@ -134,26 +166,33 @@ export class AudioCaptureManager {
   // --- API requests ---
 
   listDevices(): Promise<AudioDevice[]> {
-    return this.requestWithTimeout('list_devices_', { cmd: 'list_devices' })
-      .then((data) => data?.devices || []);
+    return this.sendRequest('list_devices_', { cmd: 'list_devices' }).then(
+      (data) => (data?.devices as AudioDevice[]) || [],
+    );
   }
 
   getBuffer(duration = 5.0): Promise<AudioChunk | null> {
-    return this.requestWithTimeout('get_buffer_', { cmd: 'get_buffer', duration })
-      .then((data) => data ? {
-        data: data.data,
-        sampleRate: data.sample_rate,
-        duration: data.duration,
-      } : null);
+    return this.sendRequest('get_buffer_', { cmd: 'get_buffer', duration }).then(
+      (data) => {
+        if (!data) {
+          return null;
+        }
+        return {
+          data: data.data as string,
+          sampleRate: data.sample_rate as number,
+          duration: data.duration as number,
+        };
+      },
+    );
   }
 
-  private requestWithTimeout(prefix: string, cmd: object): Promise<any> {
+  private sendRequest(prefix: string, command: object): Promise<WorkerMessage | null> {
     return new Promise((resolve) => {
-      const id = `${prefix}${++this.requestIdCounter}`;
-      this.pendingRequests.set(id, (data: any) => resolve(data));
-      this.sendCommand({ ...cmd, request_id: id });
+      const requestId = `${prefix}${++this.requestIdCounter}`;
+      this.pendingRequests.set(requestId, resolve);
+      this.sendCommand({ ...command, request_id: requestId });
       setTimeout(() => {
-        this.pendingRequests.delete(id);
+        this.pendingRequests.delete(requestId);
         resolve(null);
       }, 3000);
     });
@@ -163,76 +202,82 @@ export class AudioCaptureManager {
     this.onChunkCallback = callback;
   }
 
-  private sendCommand(cmd: object): void {
+  private sendCommand(command: object): void {
     if (this.process?.stdin) {
-      this.process.stdin.write(JSON.stringify(cmd) + '\n');
+      const json = `${JSON.stringify(command)}\n`;
+      this.process.stdin.write(json);
     }
   }
 
   // --- Message routing ---
 
-  private handleMessage(msg: any): void {
-    const handler = this.getMessageHandler(msg.event);
-    if (handler) handler(msg);
+  private handleMessage(message: WorkerMessage): void {
+    const handler = this.routeMessage(message.event);
+    if (handler) {
+      handler(message);
+    }
   }
 
-  private getMessageHandler(event: string): MsgHandler | null {
-    const handlers: Record<string, MsgHandler> = {
-      'audio_chunk': (m) => this.onAudioChunk(m),
-      'device_list': (m) => this.resolvePending(m, 'list_devices_'),
-      'buffer_data': (m) => this.resolvePending(m, 'get_buffer_'),
-      'vad_active':  (m) => this.sendToWindow('vad-status', m.active),
-      'status':      (m) => this.sendToWindow('capture-status', m.state),
-      'error':       (m) => console.error('[capture]', m.message),
-      'warning':     (m) => console.warn('[capture]', m.message),
+  private routeMessage(event: string): PendingResolver | null {
+    const routes: Record<string, (msg: WorkerMessage) => void> = {
+      audio_chunk: (msg) => this.handleAudioChunk(msg),
+      device_list: (msg) => this.resolveRequest(msg, 'list_devices_'),
+      buffer_data: (msg) => this.resolveRequest(msg, 'get_buffer_'),
+      vad_active: (msg) => this.sendToWindow('vad-status', msg.active),
+      status: (msg) => this.sendToWindow('capture-status', msg.state),
+      error: (msg) => console.error('[capture]', msg.message),
+      warning: (msg) => console.warn('[capture]', msg.message),
     };
-    return handlers[event] || null;
+    return routes[event] ?? null;
   }
 
-  private onAudioChunk(msg: any): void {
+  private handleAudioChunk(message: WorkerMessage): void {
     if (this.onChunkCallback) {
       this.onChunkCallback({
-        data: msg.data,
-        sampleRate: msg.sample_rate,
-        duration: msg.duration,
+        data: message.data as string,
+        sampleRate: message.sample_rate as number,
+        duration: message.duration as number,
       });
     }
     this.sendToWindow('audio-level', { level: 0.5 });
   }
 
-  private resolvePending(msg: any, prefix: string): void {
-    this.pendingRequests.forEach((resolve, id) => {
-      if (id.startsWith(prefix)) {
-        resolve(msg);
-        this.pendingRequests.delete(id);
+  private resolveRequest(message: WorkerMessage, prefix: string): void {
+    this.pendingRequests.forEach((resolver, key) => {
+      if (key.startsWith(prefix)) {
+        resolver(message);
+        this.pendingRequests.delete(key);
       }
     });
   }
 
-  private sendToWindow(channel: string, data: any): void {
+  private sendToWindow(channel: string, data: unknown): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send(channel, data);
     }
   }
 
-  // --- Helpers ---
+  // --- Utilities ---
 
-  private findPython(): string {
-    const found = ['python', 'python3', 'py'].find((cmd) => {
+  private resolvePython(): string {
+    const candidates = ['python', 'python3', 'py'];
+    const found = candidates.find((command) => {
       try {
-        return require('child_process')
-          .execSync(`${cmd} --version`, { encoding: 'utf-8' })
-          .includes('Python');
-      } catch { return false; }
+        const output = execSync(`${command} --version`, { encoding: 'utf-8' });
+        return output.includes('Python');
+      } catch {
+        return false;
+      }
     });
     return found || 'python';
   }
 
-  private getWorkerPath(): string {
-    const found = [
+  private resolveWorkerPath(): string {
+    const candidates = [
       path.join(__dirname, '../../workers/audio_capture.py'),
       path.join(process.cwd(), 'workers', 'audio_capture.py'),
-    ].find((p) => fs.existsSync(p));
-    return found || path.join(__dirname, '../../workers/audio_capture.py');
+    ];
+    const found = candidates.find((filePath) => fs.existsSync(filePath));
+    return found || candidates[0];
   }
 }

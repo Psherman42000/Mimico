@@ -1,12 +1,7 @@
 /**
  * Win32 native bindings for overlay window flags.
- * Uses ffi-napi or raw Windows API calls to set:
- * - WDA_EXCLUDEFROMCAPTURE (invisible in screen recordings)
- * - WS_EX_TOOLWINDOW (hidden from taskbar/alt-tab)
- * - WS_EX_TRANSPARENT (click-through)
- * - WS_EX_LAYERED (transparency)
- *
- * This module tries to use ffi-napi if available, otherwise returns noop.
+ * Uses ffi-napi to call SetWindowDisplayAffinity and SetWindowLongA.
+ * Falls back to noop if ffi-napi is not installed.
  */
 
 interface Win32Overlay {
@@ -16,9 +11,11 @@ interface Win32Overlay {
 }
 
 function createNoop(): Win32Overlay {
-  console.warn('Win32 native module not available — overlay may appear in screen captures');
   return {
-    setExcludeFromCapture: () => false,
+    setExcludeFromCapture: () => {
+      console.warn('Win32 native module not available — overlay may appear in captures');
+      return false;
+    },
     setTransparent: () => false,
     setClickThrough: () => false,
   };
@@ -27,17 +24,14 @@ function createNoop(): Win32Overlay {
 let nativeWindow: Win32Overlay;
 
 try {
-  // Try to use ffi-napi for Win32 calls
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ffi = require('ffi-napi');
-  const ref = require('ref-napi');
   const user32 = ffi.Library('user32', {
     SetWindowDisplayAffinity: ['bool', ['int32', 'uint32']],
     SetWindowLongA: ['int32', ['int32', 'int32', 'int32']],
     GetWindowLongA: ['int32', ['int32', 'int32']],
   });
 
-  const HWND_NOTOPMOST = -1;
-  const HWND_TOPMOST = -1;
   const GWL_EXSTYLE = -20;
   const WS_EX_LAYERED = 0x00080000;
   const WS_EX_TRANSPARENT = 0x00000020;
@@ -48,13 +42,9 @@ try {
     setExcludeFromCapture: (hwndBuffer: Buffer) => {
       try {
         const hwnd = hwndBuffer.readInt32LE(0);
-        // Set window to not appear in screen capture
         user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
-
-        // Add WS_EX_TOOLWINDOW to hide from taskbar/alt-tab
         const currentStyle = user32.GetWindowLongA(hwnd, GWL_EXSTYLE);
         user32.SetWindowLongA(hwnd, GWL_EXSTYLE, currentStyle | WS_EX_TOOLWINDOW);
-
         return true;
       } catch {
         return false;

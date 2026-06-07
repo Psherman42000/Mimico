@@ -22,8 +22,10 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
     "electron": "^30.0.0",
     "eslint": "^9.0.0",
+    "eslint-plugin-sonarjs": "^4.0.3",
     "prettier": "^3.0.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.60.1"

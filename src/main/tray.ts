@@ -5,28 +5,35 @@ export class TrayManager {
   private tray: Tray;
 
   constructor(window: BrowserWindow) {
-    // Create a simple 16x16 icon (will be replaced with proper icon later)
-    const icon = nativeImage.createEmpty();
+    const icon = this.loadIcon();
     this.tray = new Tray(icon);
+    this.tray.setToolTip('Mimico — Tradução em tempo real');
+    this.tray.setContextMenu(this.buildMenu(window));
+    this.tray.on('click', () => this.toggleWindow(window));
+  }
 
-    // Set a proper icon size
+  private loadIcon(): Electron.NativeImage {
     const iconPath = path.join(__dirname, '../../resources/icon.png');
     try {
-      this.tray.setImage(nativeImage.createFromPath(iconPath));
+      return nativeImage.createFromPath(iconPath);
     } catch {
-      // Use empty icon as fallback
-      this.tray.setImage(icon);
+      return nativeImage.createEmpty();
     }
+  }
 
-    this.tray.setToolTip('Mimico — Tradução em tempo real');
+  private toggleWindow(window: BrowserWindow): void {
+    if (window.isVisible()) {
+      window.hide();
+    } else {
+      window.show();
+    }
+  }
 
-    const contextMenu = Menu.buildFromTemplate([
+  private buildMenu(window: BrowserWindow): Electron.Menu {
+    return Menu.buildFromTemplate([
       {
         label: 'Mostrar / Ocultar Overlay',
-        click: () => {
-          if (window.isVisible()) window.hide();
-          else window.show();
-        },
+        click: () => this.toggleWindow(window),
       },
       { type: 'separator' },
       {
@@ -39,18 +46,8 @@ export class TrayManager {
       { type: 'separator' },
       {
         label: 'Sair',
-        click: () => {
-          app.quit();
-        },
+        click: () => app.quit(),
       },
     ]);
-
-    this.tray.setContextMenu(contextMenu);
-
-    // Click on tray toggles overlay
-    this.tray.on('click', () => {
-      if (window.isVisible()) window.hide();
-      else window.show();
-    });
   }
 }
