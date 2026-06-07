@@ -1,0 +1,40 @@
+appId: com.pedro.mimico
+productName: Mimico
+copyright: Copyright © 2026 Pedro
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - dist/**/*
+  - workers/**/*
+  - package.json
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  icon: assets/icon.ico
+  signDlls: false
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeaderIcon: assets/icon.ico
+  license: LICENSE
+
+extraResources:
+  - from: workers
+    to: workers
+    filter:
+      - "**/*"
+
+publish: null
