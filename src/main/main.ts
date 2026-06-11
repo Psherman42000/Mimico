@@ -115,51 +115,46 @@ let isQuitting = false;
 // ============================================================
 
 /**
- * Inicia o pipeline de processamento de áudio.
+ * Inicia o pipeline de processamento de áudio conforme o modo atual.
  *
- * Pipeline A (sempre ativo):
- * 1. AudioCapture captura chunk WASAPI loopback (áudio do sistema)
- * 2. WhisperManager transcreve chunk -> texto EN
- * 3. Translator traduz EN -> PT
- * 4. Overlay atualiza com EN + PT
- *
- * Pipeline B (se toggleVoice ON):
- * 1. MicCapture captura áudio do microfone (sua voz PT)
- * 2. WhisperManager transcreve -> texto PT
- * 3. Translator traduz PT -> EN
- * 4. VoiceManager sintetiza EN -> áudio
- * 5. AudioOutput reproduz no VB-Cable
+ * Modos:
+ * - 'off' → não inicia nada
+ * - 'subtitles' → só Pipeline A (loopback → whisper → deepl → overlay)
+ * - 'voice' → Pipeline A + Pipeline B (mic → tts → vb-cable)
  */
 async function startPipeline(): Promise<void> {
   if (isPipelineActive) return;
 
   try {
-    // Inicia captura de áudio
-    await audioCapture.start({
-      deviceName: 'default',
-      sampleRate: 16000,
-    });
-    appLog('Audio capture started');
-
-    // Inicia whisper
-    await whisperManager.start(config.whisperModelSize as 'tiny' | 'base' | 'small' | 'medium' | 'large');
-    appLog('Whisper model loaded successfully');
-
-    // Inicia output de áudio (se toggle voz ativo)
-    if (config.toggleVoice) {
-      audioOutput.start().catch((err: Error) => {
-        appLog(`Failed to start audio output: ${err.message}`);
+    // Pipeline A — sempre ativo em subtitles e voice
+    if (config.appMode === 'subtitles' || config.appMode === 'voice') {
+      await audioCapture.start({
+        deviceName: 'default',
+        sampleRate: 16000,
       });
-      // Inicia captura do microfone (Pipeline B)
-      micCapture.start().catch((err: Error) => {
-        appLog(`Failed to start mic capture: ${err.message}`);
-      });
+      appLog('Audio capture started');
+
+      await whisperManager.start(config.whisperModelSize as 'tiny' | 'base' | 'small' | 'medium' | 'large');
+      appLog('Whisper model loaded successfully');
+    }
+
+    // Pipeline B — apenas no modo voice
+    if (config.appMode === 'voice') {
+      if (config.toggleVoice) {
+        audioOutput.start().catch((err: Error) => {
+          appLog(`Failed to start audio output: ${err.message}`);
+        });
+        micCapture.start().catch((err: Error) => {
+          appLog(`Failed to start mic capture: ${err.message}`);
+        });
+      }
     }
 
     isPipelineActive = true;
     trayManager.setEnabled(true);
 
-    appLog('Pipeline started');
+    const modeLabel = config.appMode === 'voice' ? '🎤 Voz' : '💬 Legendas';
+    appLog(`Pipeline started (${modeLabel})`);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     appLog(`Failed to start pipeline: ${err.message}`);
@@ -192,6 +187,16 @@ function togglePipeline(): void {
   if (isPipelineActive) {
     stopPipeline();
   } else {
+    startPipeline();
+  }
+}
+
+/**
+ * Reinicia o pipeline conforme o modo atual.
+ */
+function restartPipeline(): void {
+  stopPipeline();
+  if (config.appMode !== 'off') {
     startPipeline();
   }
 }
@@ -365,7 +370,17 @@ function applyConfigChanges(): void {
 function registerGlobalShortcuts(): void {
   // Atalho para toggle liga/desliga
   globalShortcut.register(config.toggleHotkey, () => {
-    togglePipeline();
+    if (isPipelineActive) {
+      const next = config.appMode === 'subtitles' ? 'voice' : 'subtitles';
+      config.appMode = next;
+      saveConfig({ appMode: next });
+      restartPipeline();
+      trayManager.setMode(next);
+      const label = next === 'voice' ? '🎤 Dublagem ativa' : '💬 Só legendas';
+      trayManager.showNotification(APP_NAME, label);
+    } else {
+      startPipeline();
+    }
   });
 
   // Atalho para mostrar/esconder overlay
@@ -555,8 +570,13 @@ async function main(): Promise<void> {
   // Inicializa bandeja
   trayManager.init(
     BrowserWindow.getAllWindows()[0],
+    config.appMode,
     {
-      onToggle: togglePipeline,
+      onSetMode: (mode) => {
+        config.appMode = mode;
+        saveConfig({ appMode: mode });
+        restartPipeline();
+      },
       onSettings: openSettings,
       onQuit: () => {
         isQuitting = true;
