@@ -1,0 +1,51 @@
+/**
+ * ipc/tts.ts - Handlers IPC de síntese de voz (TTS)
+ */
+
+import { ipcMain } from 'electron';
+import type { TtsProvider } from '../tts-provider';
+
+export interface TtsIpcContext {
+  voiceManager: {
+    speakText: (text: string, lang: string) => Promise<void>;
+    stop: () => void;
+    isSpeaking: boolean;
+    getProviderName: () => string;
+    getProvider: () => TtsProvider | null;
+  };
+  appLog: (msg: string) => void;
+}
+
+export function registerTtsHandlers(ctx: TtsIpcContext): void {
+  const { voiceManager, appLog } = ctx;
+
+  ipcMain.handle('tts:speak', async (_event, text: string, lang: string) => {
+    try {
+      await voiceManager.speakText(text, lang);
+      return { success: true };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      appLog(`tts:speak error: ${msg}`);
+      return { success: false, error: msg };
+    }
+  });
+
+  ipcMain.on('tts:stop', () => {
+    voiceManager.stop();
+  });
+
+  ipcMain.handle('tts:status', () => {
+    return {
+      speaking: voiceManager.isSpeaking,
+      provider: voiceManager.getProviderName(),
+    };
+  });
+
+  ipcMain.handle('tts:provider-info', () => {
+    const provider = voiceManager.getProvider();
+    if (provider) {
+      return provider.getInfo();
+    }
+    return { name: 'Nenhum', needsApiKey: false, hasApiKey: false };
+  });
+}

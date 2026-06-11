@@ -31,6 +31,7 @@ import { TrayManager } from './tray';
 import { NotchOverlay } from './notch-overlay';
 import { EdgeTtsProvider } from './tts-edge';
 import { ElevenLabsTtsProvider } from './tts-elevenlabs';
+import { registerAllIpcHandlers } from './ipc';
 
 // ============================================================
 // Constantes do aplicativo
@@ -295,44 +296,58 @@ function processMicAudioChunk(chunk: Buffer): void {
 // ============================================================
 
 /**
- * Configura todos os handlers IPC para comunicação com o renderer.
+ * Configura todos os handlers IPC modulares.
  */
 function setupIPC(): void {
-  // Retorna a configuração atual (síncrono)
-  ipcMain.on('get-config', (event) => {
-    event.returnValue = config;
-  });
-
-  // Salva alterações na configuração
-  ipcMain.on('save-config', (_event, partial: Record<string, unknown>) => {
-    try {
+  registerAllIpcHandlers({
+    // Config
+    loadConfig: () => config,
+    saveConfig: (partial) => {
       saveConfig(partial);
-
-      // Atualiza configuração local
       config = loadConfig();
+    },
+    applyConfigChanges,
+    appLog,
 
-      // Aplica alterações em tempo real
-      applyConfigChanges();
+    // Window / Overlay
+    overlay: {
+      show: () => overlay.show(),
+      hide: () => overlay.hide(),
+      isVisible: () => overlay.isVisible(),
+      setOpacity: (v) => overlay.setOpacity(v),
+      toggleExpand: () => overlay.toggleExpand(),
+    },
 
-      // Notifica renderer
-      BrowserWindow.getAllWindows().forEach((win) => {
-        win.webContents.send('config-changed', config);
-      });
-    } catch (error) {
-      appLog(`Failed to save config: ${error}`);
-    }
-  });
+    // Audio
+    audioCapture,
+    micCapture,
+    audioOutput: {
+      start: () => audioOutput.start(),
+      stop: () => audioOutput.stop(),
+      setMixMode: (m) => audioOutput.setMixMode(m),
+    },
 
-  // Minimiza a janela
-  ipcMain.on('minimize-window', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    win?.minimize();
-  });
+    // Transcription
+    whisperManager: {
+      start: (modelSize) => whisperManager.start(modelSize as 'tiny' | 'base' | 'small' | 'medium' | 'large'),
+      stop: () => whisperManager.stop(),
+      transcribe: (chunk, lang) => whisperManager.transcribe(chunk, lang),
+    },
 
-  // Fecha a janela (envia para bandeja)
-  ipcMain.on('close-window', (event) => {
-    const win = BrowserWindow.fromWebContents(event.sender);
-    win?.hide();
+    // Translation
+    translator: {
+      translate: (text, from, to) => translator.translate(text, from, to),
+      setApiKey: (key) => translator.setApiKey(key),
+    },
+
+    // TTS
+    voiceManager: {
+      speakText: (text, lang) => voiceManager.speakText(text, lang),
+      stop: () => voiceManager.stop(),
+      isSpeaking: voiceManager.isSpeaking,
+      getProviderName: () => voiceManager.getProviderName(),
+      getProvider: () => voiceManager.getProvider(),
+    },
   });
 }
 
