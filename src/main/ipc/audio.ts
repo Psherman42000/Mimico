@@ -1,8 +1,4 @@
-/**
- * ipc/audio.ts - Handlers IPC de áudio
- *
- * Controle de captura de áudio WASAPI (loopback + mic).
- */
+/** ipc/audio.ts - Handlers IPC de áudio */
 
 import { ipcMain } from 'electron';
 

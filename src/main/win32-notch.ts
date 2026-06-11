@@ -1,9 +1,4 @@
-/**
- * win32-notch.ts - Forma nativa Windows para o notch overlay
- *
- * Usa win.setShape() para criar click-through fora da área do notch.
- * Inspirado no overlayMouseControl do Perssua.
- */
+/** win32-notch.ts - Forma nativa Windows para o notch overlay */
 
 import { BrowserWindow } from 'electron';
 

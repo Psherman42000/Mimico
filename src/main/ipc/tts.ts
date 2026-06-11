@@ -1,6 +1,4 @@
-/**
- * ipc/tts.ts - Handlers IPC de síntese de voz (TTS)
- */
+/** ipc/tts.ts - Handlers IPC de síntese de voz (TTS) */
 
 import { ipcMain } from 'electron';
 import type { TtsProvider } from '../tts-provider';

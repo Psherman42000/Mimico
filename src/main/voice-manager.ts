@@ -1,23 +1,9 @@
-/**
- * voice-manager.ts - Facade de gerenciamento de síntese de voz
- *
- * Delega para o TtsProvider ativo (Edge ou ElevenLabs).
- * Permite hot-swap entre provedores em tempo de execução.
- *
- * Eventos emitidos:
- * - 'started': Início da síntese
- * - 'finished': Síntese concluída
- * - 'error': Erro na síntese
- * - 'audio': Buffer WAV/PCM com o áudio
- */
+/** voice-manager.ts - Facade de gerenciamento de síntese de voz */
 
 import { EventEmitter } from 'events';
 import { TtsProvider } from './tts-provider';
 
-/**
- * Facade que gerencia o provedor TTS ativo.
- * Delega speak/stop/dispose para o provider atual.
- */
+/** Facade que gerencia o provedor TTS ativo, delega speak/stop/dispose. */
 export class VoiceManager extends EventEmitter {
   private provider: TtsProvider | null = null;
   private speaking = false;
@@ -65,16 +51,10 @@ export class VoiceManager extends EventEmitter {
     }
   }
 
-  /**
-   * Retorna o provider ativo.
-   */
   getProvider(): TtsProvider | null {
     return this.provider;
   }
 
-  /**
-   * Retorna o nome do provider ativo.
-   */
   getProviderName(): string {
     return this.provider?.name ?? 'Nenhum';
   }
@@ -93,24 +73,15 @@ export class VoiceManager extends EventEmitter {
     await this.provider.speak({ text, lang });
   }
 
-  /**
-   * Interrompe a síntese em andamento.
-   */
   stop(): void {
     this.provider?.stop();
     this.speaking = false;
   }
 
-  /**
-   * Verifica se está sintetizando no momento.
-   */
   get isSpeaking(): boolean {
     return this.speaking;
   }
 
-  /**
-   * Libera recursos.
-   */
   dispose(): void {
     if (this.provider) {
       this.provider.dispose();

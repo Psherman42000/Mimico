@@ -1,8 +1,4 @@
-/**
- * ipc/window.ts - Handlers IPC da janela overlay/notch
- *
- * Controle de visibilidade, minimizar, fechar para bandeja.
- */
+/** ipc/window.ts - Handlers IPC da janela overlay/notch */
 
 import { ipcMain, BrowserWindow } from 'electron';
 

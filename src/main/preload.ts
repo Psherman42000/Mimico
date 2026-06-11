@@ -1,19 +1,4 @@
-/**
- * preload.ts - Ponte de segurança entre main e renderer
- *
- * Usa contextBridge para expor uma API segura ao processo renderer,
- * evitando que o código da janela tenha acesso direto ao Node.js/Electron.
- *
- * API exposta via window.mimicoAPI:
- * - onTranscription(callback) - Escuta transcrições em tempo real
- * - onToggle(callback) - Notifica mudanças de estado (ligado/desligado)
- * - onConfigChanged(callback) - Notifica alterações na configuração
- * - getConfig() - Obtém a configuração atual
- * - saveConfig(partial) - Salva alterações na configuração
- * - minimize() - Minimiza a janela principal
- * - close() - Fecha a janela principal
- * - getPlatform() - Retorna 'win32' (plataforma atual)
- */
+/** preload.ts - Ponte de segurança entre main e renderer */
 
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -89,32 +74,18 @@ contextBridge.exposeInMainWorld('mimicoAPI', {
     return ipcRenderer.sendSync('get-config');
   },
 
-  /**
-   * Envia alterações parciais de configuração para o processo main.
-   * O main persiste as alterações e notifica todos os listeners.
-   */
   saveConfig: (partial: Record<string, unknown>): void => {
     ipcRenderer.send('save-config', partial);
   },
 
-  /**
-   * Solicita ao processo main que minimize a janela.
-   */
   minimize: (): void => {
     ipcRenderer.send('minimize-window');
   },
 
-  /**
-   * Solicita ao processo main que feche a janela (envia para bandeja).
-   */
   close: (): void => {
     ipcRenderer.send('close-window');
   },
 
-  /**
-   * Retorna a plataforma em execução.
-   * No Windows, retorna 'win32'.
-   */
   getPlatform: (): string => {
     return process.platform;
   },

@@ -1,9 +1,4 @@
-/**
- * ipc/index.ts - Orquestrador de handlers IPC
- *
- * Registra todos os handlers IPC por domínio.
- * Cada domínio é responsável por limpar seus handlers (se aplicável).
- */
+/** ipc/index.ts - Orquestrador de handlers IPC */
 
 import { registerConfigHandlers, ConfigIpcContext } from './config';
 import { registerWindowHandlers, WindowIpcContext } from './window';

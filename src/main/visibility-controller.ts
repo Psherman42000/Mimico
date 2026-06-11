@@ -1,18 +1,4 @@
-/**
- * visibility-controller.ts - Stealth Mode (Ctrl+B hold-to-fade)
- *
- * Inspirado no VisibilityShortcutController do Perssua.
- *
- * Comportamento:
- * - Tap (< 650ms): alterna notch visível/invisível (toggle)
- * - Hold (> 650ms): reduz opacidade gradualmente (0.85 → 0.25)
- * - Soltar durante hold: restaura opacidade imediatamente
- * - Soltar após tap: mantém estado (toggle)
- *
- * Integração com tray menu:
- * - Item "👁 Stealth" com submenu (Tap/Hold)
- * - CSS custom property para modais acompanharem o fade
- */
+/** visibility-controller.ts - Stealth Mode (Ctrl+B hold-to-fade) */
 
 import { globalShortcut } from 'electron';
 
@@ -52,15 +38,7 @@ export interface VisibilityControllerTarget {
   showInactive?: () => void;
 }
 
-/**
- * Controlador de visibilidade com hold-to-fade.
- *
- * Uso:
- * ```ts
- * const ctrl = new VisibilityController({ getMainWindow: () => notchWindow });
- * ctrl.register('Ctrl+B');
- * ```
- */
+/** Controlador de visibilidade com hold-to-fade (tap toggle, hold fade). */
 export class VisibilityController {
   private state: ControllerState = 'idle';
   private holdOpacity = 1;
@@ -86,9 +64,6 @@ export class VisibilityController {
     });
   }
 
-  /**
-   * Remove o atalho global.
-   */
   unregister(): void {
     globalShortcut.unregisterAll();
   }
@@ -209,9 +184,6 @@ export class VisibilityController {
     }
   }
 
-  /**
-   * Força visível (restaura opacidade e mostra).
-   */
   show(): void {
     this.target = this.getMainWindow();
     if (!this.target) return;
@@ -222,9 +194,6 @@ export class VisibilityController {
     this.state = 'idle';
   }
 
-  /**
-   * Força oculto.
-   */
   hide(): void {
     this.target = this.getMainWindow();
     if (!this.target) return;
@@ -234,9 +203,6 @@ export class VisibilityController {
     this.state = 'idle';
   }
 
-  /**
-   * Libera recursos.
-   */
   dispose(): void {
     this.releaseHold();
     if (this.tapTimer) clearTimeout(this.tapTimer);

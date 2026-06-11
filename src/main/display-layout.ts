@@ -1,9 +1,4 @@
-/**
- * display-layout.ts - Gerenciamento de monitores e DPI scaling
- *
- * Inspirado no DisplayTopologyCoordinator + displayLayout.js do Perssua.
- * Garante que o notch overlay se posicione corretamente em múltiplos monitores.
- */
+/** display-layout.ts - Gerenciamento de monitores e DPI scaling */
 
 import { screen, BrowserWindow, Display } from 'electron';
 
@@ -15,9 +10,6 @@ export interface Rect {
   height: number;
 }
 
-/**
- * Retorna a área de trabalho útil de um display (excluindo taskbar).
- */
 export function getDisplayWorkArea(display: Display): Rect {
   return display.workArea;
 }
@@ -39,9 +31,6 @@ export function normalizeWindowZoom(win: BrowserWindow): void {
   win.webContents.setZoomFactor(zoom);
 }
 
-/**
- * Encontra o display que contém o centro do retângulo dado.
- */
 export function getDisplayMatchingBounds(bounds: Rect): Display {
   return screen.getDisplayMatching(bounds);
 }
@@ -73,31 +62,18 @@ export class DisplayTopologyCoordinator {
     this.lastDisplayCount = screen.getAllDisplays().length;
   }
 
-  /**
-   * Registra uma janela para ser monitorada.
-   */
   registerWindow(id: string, win: BrowserWindow): void {
     this.windows.set(id, win);
   }
 
-  /**
-   * Remove uma janela do monitoramento.
-   */
   unregisterWindow(id: string): void {
     this.windows.delete(id);
   }
 
-  /**
-   * Registra callback para quando o display mudar.
-   */
   onDisplayChanged(callback: () => void): void {
     this.callbacks.push(callback);
   }
 
-  /**
-   * Inicia o polling periódico de mudanças de display.
-   * Alternativa ao 'display-metrics-changed' que nem sempre dispara.
-   */
   start(): void {
     if (this.checkInterval) return;
     this.checkInterval = setInterval(() => {
@@ -109,9 +85,6 @@ export class DisplayTopologyCoordinator {
     }, 2000);
   }
 
-  /**
-   * Para o polling.
-   */
   stop(): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
@@ -119,18 +92,12 @@ export class DisplayTopologyCoordinator {
     }
   }
 
-  /**
-   * Notifica todos os callbacks registrados.
-   */
   notify(): void {
     for (const cb of this.callbacks) {
       try { cb(); } catch { /* ignore */ }
     }
   }
 
-  /**
-   * Libera recursos.
-   */
   dispose(): void {
     this.stop();
     this.windows.clear();

@@ -1,13 +1,4 @@
-/**
- * tray.ts - Ícone e menu da bandeja do sistema
- *
- * Cria um ícone na bandeja do Windows com as seguintes opções:
- * - 3 modos: Off / Legendas / Voz (radio-style)
- * - Configurações: Abre a janela de configurações
- * - Sair: Encerra o aplicativo completamente
- *
- * O menu é reconstruído a cada clique (sempre atualizado).
- */
+/** tray.ts - Ícone e menu da bandeja do sistema */
 
 import { Tray, Menu, nativeImage, BrowserWindow, MenuItemConstructorOptions } from 'electron';
 import { resolve } from 'path';
@@ -142,9 +133,6 @@ export class TrayManager {
     this.updateMenu();
   }
 
-  /**
-   * Define o modo atual e atualiza o menu.
-   */
   setMode(mode: 'off' | 'subtitles' | 'voice'): void {
     currentMode = mode;
     this.updateMenu();
@@ -172,27 +160,18 @@ export class TrayManager {
     this.tray?.setImage(icon);
   }
 
-  /**
-   * Reconstrói o menu de contexto.
-   */
   private updateMenu(): void {
     if (!this.tray) return;
     const menu = buildTrayMenu(this.mainWindow, this.handlers);
     this.tray.setContextMenu(menu);
   }
 
-  /**
-   * Exibe uma notificação do sistema.
-   */
   showNotification(title: string, body: string): void {
     if (this.tray) {
       this.tray.displayBalloon({ title, content: body });
     }
   }
 
-  /**
-   * Remove o ícone da bandeja.
-   */
   destroy(): void {
     if (this.tray) {
       this.tray.destroy();

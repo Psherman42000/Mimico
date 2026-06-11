@@ -1,9 +1,4 @@
-/**
- * tts-provider.ts - Interface de provedor TTS
- *
- * Define o contrato que todos os provedores TTS (Edge, ElevenLabs, etc.)
- * devem implementar. Permite hot-swap em tempo de execução.
- */
+/** tts-provider.ts - Interface de provedor TTS */
 
 import { EventEmitter } from 'events';
 

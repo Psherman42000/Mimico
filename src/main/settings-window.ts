@@ -1,13 +1,4 @@
-/**
- * settings-window.ts - Janela de configurações do Mimico
- *
- * BrowserWindow separada, independente do notch overlay.
- * Inspirada no settingsOnboardingWindow.js do Perssua.
- *
- * Dimensões: 780x540 (adaptável ao display)
- * Posição: centralizada no display atual, persistente
- * SkipTaskbar: true (só abre via tray)
- */
+/** settings-window.ts - Janela de configurações do Mimico */
 
 import { BrowserWindow, screen } from 'electron';
 import { resolve } from 'path';
@@ -129,9 +120,6 @@ export class SettingsWindow {
     return this.window;
   }
 
-  /**
-   * Mostra a janela (cria se necessário).
-   */
   show(): void {
     if (this.window && !this.window.isDestroyed()) {
       this.window.show();
@@ -141,16 +129,10 @@ export class SettingsWindow {
     }
   }
 
-  /**
-   * Oculta a janela (mantém instância).
-   */
   hide(): void {
     this.window?.hide();
   }
 
-  /**
-   * Alterna visibilidade.
-   */
   toggle(): void {
     if (this.window && !this.window.isDestroyed() && this.window.isVisible()) {
       this.window.hide();
@@ -159,9 +141,6 @@ export class SettingsWindow {
     }
   }
 
-  /**
-   * Verifica se a janela está visível.
-   */
   isVisible(): boolean {
     return this.window !== null && !this.window.isDestroyed() && this.window.isVisible();
   }
@@ -187,9 +166,6 @@ export class SettingsWindow {
     this.window = null;
   }
 
-  /**
-   * Libera recursos.
-   */
   dispose(): void {
     this.close();
   }

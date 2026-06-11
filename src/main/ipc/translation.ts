@@ -1,6 +1,4 @@
-/**
- * ipc/translation.ts - Handlers IPC de tradução (DeepL)
- */
+/** ipc/translation.ts - Handlers IPC de tradução (DeepL) */
 
 import { ipcMain } from 'electron';
 

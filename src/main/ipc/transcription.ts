@@ -1,6 +1,4 @@
-/**
- * ipc/transcription.ts - Handlers IPC de transcrição (Whisper)
- */
+/** ipc/transcription.ts - Handlers IPC de transcrição (Whisper) */
 
 import { ipcMain } from 'electron';
 

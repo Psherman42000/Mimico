@@ -1,13 +1,4 @@
-/**
- * notch-overlay.ts - Notch Overlay (pílula expansível no topo-centro)
- *
- * Substitui o overlay.ts tradicional por um notch estilo Perssua:
- * - Colapsado: pílula 300x34px no topo-centro da tela
- * - Expandido: painel ~450x320px com feed de tradução + sidebar
- * - Auto-expand ao receber tradução, auto-collapse após 5s silêncio
- * - Animação spring-style via CSS transitions
- * - Win32 click-through via win.setShape()
- */
+/** notch-overlay.ts - Notch Overlay (pílula expansível no topo-centro) */
 
 import { BrowserWindow, ipcMain, screen } from 'electron';
 import { resolve } from 'path';
@@ -29,17 +20,7 @@ const AUTO_COLLAPSE_MS = 5000;
 /** Estado de modo */
 type AppMode = 'off' | 'subtitles' | 'voice';
 
-/**
- * Gerenciador do notch overlay.
- *
- * Comportamento:
- * - Colapsado: pílula 300x34 no topo, bolinha verde
- * - Expandido: painel com status bar + feed de tradução + 3 abas
- * - Auto-expand na chegada de tradução
- * - Auto-collapse após AUTO_COLLAPSE_MS sem tradução
- * - Click-through via win.setShape()
- * - Multi-monitor via DisplayTopologyCoordinator
- */
+/** Gerenciador do notch overlay (colapsado/expandido, auto-collapse, click-through). */
 export class NotchOverlay {
   private window: BrowserWindow | null = null;
   private isExpanded = false;
@@ -116,9 +97,6 @@ export class NotchOverlay {
     this.sendInitState();
   }
 
-  /**
-   * Configura os listeners IPC.
-   */
   private setupIPC(): void {
     ipcMain.on('notch-toggle-voice', (_event, active: boolean) => {
       this.voiceActive = active;
@@ -133,9 +111,6 @@ export class NotchOverlay {
   /** Callback externo para toggle de voz */
   onToggleVoice: ((active: boolean) => void) | null = null;
 
-  /**
-   * Envia estado inicial para o renderer.
-   */
   private sendInitState(): void {
     this.sendToRenderer('notch-init', {
       mode: this.currentMode,
@@ -147,9 +122,6 @@ export class NotchOverlay {
 
   // ── Estado colapsado/expandido ──
 
-  /**
-   * Colapsa o notch (pílula pequena).
-   */
   private setCollapsed(): void {
     this.isExpanded = false;
     const bounds = this.getAlignedBounds(false);
@@ -157,9 +129,6 @@ export class NotchOverlay {
     applyNotchShape(this.window!, false);
   }
 
-  /**
-   * Expande o notch (painel completo).
-   */
   private setExpanded(): void {
     this.isExpanded = true;
     const bounds = this.getAlignedBounds(true);
@@ -167,9 +136,6 @@ export class NotchOverlay {
     applyNotchShape(this.window!, true);
   }
 
-  /**
-   * Alterna entre expandido e colapsado.
-   */
   toggleExpand(): void {
     if (this.isExpanded) {
       this.setCollapsed();
@@ -217,9 +183,6 @@ export class NotchOverlay {
     this.scheduleCollapse();
   }
 
-  /**
-   * Limpa o feed de tradução.
-   */
   clearText(): void {
     this.lastText = { en: '', pt: '' };
 
@@ -231,82 +194,52 @@ export class NotchOverlay {
 
   // ── Atualizações de estado ──
 
-  /**
-   * Atualiza o modo de operação (off/subtitles/voice).
-   */
   setMode(mode: AppMode): void {
     this.currentMode = mode;
     this.sendToRenderer('notch-mode', mode);
   }
 
-  /**
-   * Atualiza o provider TTS (Edge / ElevenLabs).
-   */
   setTtsProvider(provider: string): void {
     this.ttsProvider = provider;
     this.sendToRenderer('notch-tts', provider);
   }
 
-  /**
-   * Atualiza o estado do toggle de voz.
-   */
   setVoiceActive(active: boolean): void {
     this.voiceActive = active;
     this.sendToRenderer('notch-voice', active);
   }
 
-  /**
-   * Atualiza o modo de mix (replace/overlay).
-   */
   setMixMode(mode: 'replace' | 'overlay'): void {
     this.mixMode = mode;
     this.sendToRenderer('notch-mix', mode);
   }
 
-  /**
-   * Mostra/esconde o overlay de "conectando...".
-   */
   setConnecting(visible: boolean): void {
     this.sendToRenderer('notch-connecting', visible);
   }
 
   // ── Controles de janela ──
 
-  /**
-   * Define a opacidade da janela.
-   */
   setOpacity(value: number): void {
     this.opacity = Math.max(0, Math.min(1, value));
     this.window?.setOpacity(this.opacity);
   }
 
-  /**
-   * Retorna a opacidade atual.
-   */
   getOpacity(): number {
     return this.opacity;
   }
 
-  /**
-   * Mostra o notch.
-   */
   show(): void {
     this.isShown = true;
     this.window?.show();
     this.window?.setOpacity(this.opacity);
   }
 
-  /**
-   * Oculta o notch.
-   */
   hide(): void {
     this.isShown = false;
     this.window?.hide();
   }
 
-  /**
-   * Verifica se o notch está visível.
-   */
   isVisible(): boolean {
     return this.window !== null && !this.window.isDestroyed() && this.window.isVisible();
   }
@@ -324,9 +257,6 @@ export class NotchOverlay {
     normalizeWindowZoom(this.window);
   }
 
-  /**
-   * Calcula bounds alinhados ao topo-centro do display primário.
-   */
   private getAlignedBounds(expanded: boolean): Electron.Rectangle {
     const display = screen.getPrimaryDisplay();
     const workArea = display.workArea;
@@ -339,9 +269,6 @@ export class NotchOverlay {
     return { x, y, width, height };
   }
 
-  /**
-   * Envia uma mensagem IPC para o renderer do notch.
-   */
   private sendToRenderer(channel: string, data?: unknown): void {
     if (!this.window || this.window.isDestroyed()) return;
     try {
@@ -371,9 +298,6 @@ export class NotchOverlay {
     this.window = null;
   }
 
-  /**
-   * Libera recursos (alias para close).
-   */
   dispose(): void {
     this.close();
   }

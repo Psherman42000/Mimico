@@ -1,9 +1,4 @@
-/**
- * config.ts - Gerenciamento de configuração do Mimico
- *
- * Usa JSON simples em app.getPath('userData') para persistir configurações.
- * Sem dependências externas, evitando problemas de tipo com electron-store.
- */
+/** config.ts - Gerenciamento de configuração do Mimico */
 
 import { app } from 'electron';
 import * as fs from 'fs';

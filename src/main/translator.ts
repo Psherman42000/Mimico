@@ -1,13 +1,4 @@
-/**
- * translator.ts - Tradutor DeepL com cache LRU
- *
- * Fornece tradução de texto usando a API DeepL (v2).
- * Implementa cache LRU (Least Recently Used) com ~1000 entradas
- * para evitar chamadas repetidas de API para textos idênticos.
- *
- * Se a chave da API DeepL não estiver configurada, retorna o texto
- * original com um aviso entre colchetes.
- */
+/** translator.ts - Tradutor DeepL com cache LRU */
 
 import { EventEmitter } from 'events';
 
@@ -91,9 +82,6 @@ class LRUCache {
     this.addToFront(node);
   }
 
-  /**
-   * Remove um nó da lista duplamente encadeada.
-   */
   private removeNode(node: LRUNode): void {
     if (node.prev) node.prev.next = node.next;
     if (node.next) node.next.prev = node.prev;
@@ -103,9 +91,6 @@ class LRUCache {
     node.next = null;
   }
 
-  /**
-   * Adiciona um nó ao início da lista (mais recente).
-   */
   private addToFront(node: LRUNode): void {
     node.next = this.head;
     node.prev = null;
@@ -114,26 +99,18 @@ class LRUCache {
     if (!this.tail) this.tail = node;
   }
 
-  /**
-   * Limpa todo o cache.
-   */
   clear(): void {
     this.map.clear();
     this.head = null;
     this.tail = null;
   }
 
-  /**
-   * Retorna o tamanho atual do cache.
-   */
   get size(): number {
     return this.map.size;
   }
 }
 
-/**
- * Tradutor usando API DeepL com cache LRU integrado.
- */
+/** Tradutor usando API DeepL com cache LRU integrado. */
 export class Translator extends EventEmitter {
   /** Chave da API DeepL */
   private apiKey: string;
@@ -163,9 +140,6 @@ export class Translator extends EventEmitter {
     this.cache.clear();
   }
 
-  /**
-   * Verifica se a API está configurada.
-   */
   isConfigured(): boolean {
     return this.configured;
   }
@@ -276,23 +250,14 @@ export class Translator extends EventEmitter {
     }
   }
 
-  /**
-   * Limpa o cache de traduções.
-   */
   clearCache(): void {
     this.cache.clear();
   }
 
-  /**
-   * Retorna o tamanho atual do cache.
-   */
   get cacheSize(): number {
     return this.cache.size;
   }
 
-  /**
-   * Libera recursos.
-   */
   dispose(): void {
     this.cache.clear();
     this.removeAllListeners();

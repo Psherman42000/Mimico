@@ -1,8 +1,4 @@
-/**
- * ipc/config.ts - Handlers IPC de configuração
- *
- * CRUD da configuração com broadcast para todas as janelas.
- */
+/** ipc/config.ts - Handlers IPC de configuração */
 
 import { ipcMain, BrowserWindow } from 'electron';
 import type { Config } from '../config';
