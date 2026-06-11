@@ -33,6 +33,7 @@ import { EdgeTtsProvider } from './tts-edge';
 import { ElevenLabsTtsProvider } from './tts-elevenlabs';
 import { registerAllIpcHandlers } from './ipc';
 import { VisibilityController } from './visibility-controller';
+import { SettingsWindow } from './settings-window';
 
 // ============================================================
 // Constantes do aplicativo
@@ -110,6 +111,9 @@ let overlay: NotchOverlay;
 
 /** Controlador stealth mode (Ctrl+B hold-to-fade) */
 let visibilityController: VisibilityController;
+
+/** Janela de configurações */
+let settingsWindow: SettingsWindow;
 
 /** Indica se o pipeline está ativo (capturando + transcrevendo) */
 let isPipelineActive = false;
@@ -230,6 +234,9 @@ function processAudioChunk(chunk: Buffer): void {
 
           // Atualiza overlay
           overlay.updateText(enText, displayPT);
+
+          // Broadcast para janela de configurações (feed ao vivo)
+          broadcastTranslationToSettings(enText, displayPT);
 
           // Se toggle voz ativo, sintetiza PT
           if (config.toggleVoice && !ptText.startsWith('[')) {
@@ -500,17 +507,26 @@ function unregisterGlobalShortcuts(): void {
 // ============================================================
 
 /**
+ * Envia tradução para a janela de configurações (feed ao vivo).
+ */
+function broadcastTranslationToSettings(en: string, pt: string): void {
+  try {
+    const wins = BrowserWindow.getAllWindows();
+    for (const win of wins) {
+      if (!win.isDestroyed() && win.webContents.getURL().includes('settings.html')) {
+        win.webContents.send('translation-feed', { en, pt });
+      }
+    }
+  } catch {
+    // Settings window pode não existir ainda
+  }
+}
+
+/**
  * Abre a janela de configurações.
  */
 function openSettings(): void {
-  // Por enquanto, apenas mostra a janela principal
-  // Em versões futuras, abrirá uma janela de configurações dedicada
-  const windows = BrowserWindow.getAllWindows();
-  if (windows.length > 0) {
-    const mainWin = windows[0];
-    mainWin.show();
-    mainWin.focus();
-  }
+  settingsWindow?.show();
 }
 
 // ============================================================
@@ -718,6 +734,9 @@ async function main(): Promise<void> {
   });
   visibilityController.register('CmdOrCtrl+B');
 
+  // Inicializa janela de configurações
+  settingsWindow = new SettingsWindow();
+
   // Configura listeners dos módulos
   setupModuleListeners();
 
@@ -788,6 +807,7 @@ function cleanup(): void {
   visibilityController?.dispose();
   trayManager?.destroy();
   overlay?.dispose();
+  settingsWindow?.dispose();
   audioCapture?.dispose();
   micCapture?.dispose();
   whisperManager?.dispose();
