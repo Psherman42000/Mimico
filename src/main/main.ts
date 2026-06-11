@@ -29,6 +29,8 @@ import { VoiceManager } from './voice-manager';
 import { AudioOutput } from './audio-output';
 import { TrayManager } from './tray';
 import { NotchOverlay } from './notch-overlay';
+import { EdgeTtsProvider } from './tts-edge';
+import { ElevenLabsTtsProvider } from './tts-elevenlabs';
 
 // ============================================================
 // Constantes do aplicativo
@@ -357,6 +359,15 @@ function applyConfigChanges(): void {
   // Atualiza toggle de voz no notch
   overlay.setVoiceActive(config.toggleVoice);
 
+  // Se TTS provider mudou, hot-swap
+  const currentProviderName = voiceManager.getProviderName();
+  const targetProviderName = config.ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Edge';
+  if (currentProviderName !== targetProviderName) {
+    initTtsProvider().catch((err) => {
+      appLog(`TTS provider swap failed: ${err.message}`);
+    });
+  }
+
   // Se toggle voz mudou, inicia/para audio output + mic capture
   if (isPipelineActive) {
     if (config.toggleVoice) {
@@ -369,6 +380,57 @@ function applyConfigChanges(): void {
     } else {
       audioOutput.stop();
       micCapture.stop();
+    }
+  }
+}
+
+// ============================================================
+// TTS Provider Management
+// ============================================================
+
+/** Provider TTS Edge (instância singleton) */
+let edgeProvider: EdgeTtsProvider | null = null;
+/** Provider TTS ElevenLabs (instância singleton) */
+let elevenLabsProvider: ElevenLabsTtsProvider | null = null;
+
+/**
+ * Inicializa o provider TTS conforme a configuração atual.
+ */
+async function initTtsProvider(): Promise<void> {
+  try {
+    if (config.ttsProvider === 'elevenlabs') {
+      if (!elevenLabsProvider) {
+        elevenLabsProvider = new ElevenLabsTtsProvider(
+          config.elevenLabsKey,
+          config.elevenLabsVoiceId,
+          config.elevenLabsModel,
+        );
+      } else {
+        elevenLabsProvider.setApiKey(config.elevenLabsKey);
+        elevenLabsProvider.setVoiceId(config.elevenLabsVoiceId);
+        elevenLabsProvider.setModelId(config.elevenLabsModel);
+      }
+      await voiceManager.setProvider(elevenLabsProvider);
+      appLog(`TTS provider: ElevenLabs (${config.elevenLabsModel})`);
+    } else {
+      if (!edgeProvider) {
+        edgeProvider = new EdgeTtsProvider();
+      }
+      await voiceManager.setProvider(edgeProvider);
+      appLog('TTS provider: Edge');
+    }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    appLog(`TTS init error: ${err.message}`);
+    // Fallback pra Edge se ElevenLabs falhar
+    if (config.ttsProvider === 'elevenlabs') {
+      try {
+        if (!edgeProvider) edgeProvider = new EdgeTtsProvider();
+        await voiceManager.setProvider(edgeProvider);
+        appLog('Falling back to Edge TTS');
+      } catch {
+        // Silêncio
+      }
     }
   }
 }
@@ -448,7 +510,7 @@ function initializeModules(): void {
   micCapture = new MicCapture();
   whisperManager = new WhisperManager();
   translator = new Translator(config.deepKey);
-  voiceManager = new VoiceManager('cli');
+  voiceManager = new VoiceManager();
   audioOutput = new AudioOutput(config.vbcableDevice);
 
   // Cria notch overlay
@@ -596,6 +658,9 @@ async function main(): Promise<void> {
 
   // Cria overlay
   await overlay.create(config.overlayOpacity);
+
+  // Inicializa TTS provider conforme config
+  await initTtsProvider();
 
   // Configura IPC
   setupIPC();
