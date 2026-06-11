@@ -546,7 +546,7 @@ function initializeModules(): void {
   whisperManager = new WhisperManager();
   translator = new Translator(config.deepKey);
   voiceManager = new VoiceManager();
-  audioOutput = new AudioOutput(config.vbcableDevice);
+  audioOutput = new AudioOutput();
 
   // Cria notch overlay
   overlay = new NotchOverlay();
@@ -622,7 +622,7 @@ function setupModuleListeners(): void {
 
   // VoiceManager -> AudioOutput (pipe de áudio WAV para VB-Cable)
   voiceManager.on('audio', (buffer: Buffer) => {
-    if (config.toggleVoice && audioOutput.isActive) {
+    if (config.toggleVoice && audioOutput.running) {
       audioOutput.play(buffer).catch((err: Error) => {
         appLog(`Audio output play error: ${err.message}`);
       });
