@@ -147,30 +147,39 @@ function setupIPC(): void {
   });
 }
 
-function applyConfigChanges(): void {
+function syncOverlayConfig(): void {
   overlay.setOpacity(config.overlayOpacity);
-  translator.setApiKey(config.deepKey);
-  audioOutput.setMixMode(config.voiceMixMode);
   overlay.setMixMode(config.voiceMixMode);
   overlay.setMode(config.appMode);
   overlay.setTtsProvider(config.ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Edge');
   overlay.setVoiceActive(config.toggleVoice);
+  audioOutput.setMixMode(config.voiceMixMode);
+}
 
-  const currentProviderName = voiceManager.getProviderName();
-  const targetProviderName = config.ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Edge';
-  if (currentProviderName !== targetProviderName) {
-    safeAsync(() => initTtsProvider(), (err) => appLog(`TTS provider swap failed: ${err.message}`));
+function syncTtsProvider(): void {
+  const current = voiceManager.getProviderName();
+  const target = config.ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Edge';
+  if (current !== target) {
+    safeAsync(() => initTtsProvider(), (err) => appLog(`TTS swap failed: ${err.message}`));
   }
+}
 
-  if (pipeline.active) {
-    if (config.toggleVoice) {
-      safeAsync(() => audioOutput.start(), (err) => appLog(`Failed to start audio output: ${err.message}`));
-      safeAsync(() => micCapture.start(), (err) => appLog(`Failed to start mic capture: ${err.message}`));
-    } else {
-      audioOutput.stop();
-      micCapture.stop();
-    }
+function syncVoiceToggle(): void {
+  if (!pipeline.active) return;
+  if (config.toggleVoice) {
+    safeAsync(() => audioOutput.start(), (err) => appLog(`Failed to start audio output: ${err.message}`));
+    safeAsync(() => micCapture.start(), (err) => appLog(`Failed to start mic capture: ${err.message}`));
+  } else {
+    audioOutput.stop();
+    micCapture.stop();
   }
+}
+
+function applyConfigChanges(): void {
+  translator.setApiKey(config.deepKey);
+  syncOverlayConfig();
+  syncTtsProvider();
+  syncVoiceToggle();
 }
 
 // ── Shortcuts ──
