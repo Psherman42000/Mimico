@@ -344,6 +344,9 @@ function applyConfigChanges(): void {
   // Atualiza chave da API DeepL
   translator.setApiKey(config.deepKey);
 
+  // Atualiza mix mode (replace/overlay)
+  audioOutput.setMixMode(config.voiceMixMode);
+
   // Se toggle voz mudou, inicia/para audio output + mic capture
   if (isPipelineActive) {
     if (config.toggleVoice) {

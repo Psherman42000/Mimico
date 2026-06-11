@@ -424,6 +424,22 @@ export class AudioOutput extends EventEmitter {
   }
 
   /**
+   * Define o modo de mix de áudio: replace ou overlay.
+   * replace = muta microfone original, só áudio traduzido
+   * overlay = microfone original + áudio traduzido juntos
+   */
+  setMixMode(mode: 'replace' | 'overlay'): void {
+    this.log(`Mix mode set to: ${mode}`);
+    // Por enquanto apenas log — implementação real requer
+    // modificar o worker Python audio_output.py para aceitar
+    // comando set_mix_mode e tratar os dois modos
+    if (this.process && this.process.stdin?.writable) {
+      const msg = JSON.stringify({ command: 'set_mix_mode', mode }) + '\n';
+      this.process.stdin.write(msg);
+    }
+  }
+
+  /**
    * Encerra o worker (alias para dispose).
    */
   shutdown(): void {
