@@ -32,6 +32,7 @@ import { NotchOverlay } from './notch-overlay';
 import { EdgeTtsProvider } from './tts-edge';
 import { ElevenLabsTtsProvider } from './tts-elevenlabs';
 import { registerAllIpcHandlers } from './ipc';
+import { VisibilityController } from './visibility-controller';
 
 // ============================================================
 // Constantes do aplicativo
@@ -106,6 +107,9 @@ let trayManager: TrayManager;
 
 /** Notch overlay (pílula expansível no topo-centro) */
 let overlay: NotchOverlay;
+
+/** Controlador stealth mode (Ctrl+B hold-to-fade) */
+let visibilityController: VisibilityController;
 
 /** Indica se o pipeline está ativo (capturando + transcrevendo) */
 let isPipelineActive = false;
@@ -702,6 +706,18 @@ async function main(): Promise<void> {
   // Registra atalhos globais
   registerGlobalShortcuts();
 
+  // Inicializa stealth mode (Ctrl+B hold-to-fade)
+  visibilityController = new VisibilityController({
+    getMainWindow: () => ({
+      getOpacity: () => overlay.getOpacity(),
+      setOpacity: (v) => overlay.setOpacity(v),
+      show: () => overlay.show(),
+      hide: () => overlay.hide(),
+      isVisible: () => overlay.isVisible(),
+    }),
+  });
+  visibilityController.register('CmdOrCtrl+B');
+
   // Configura listeners dos módulos
   setupModuleListeners();
 
@@ -769,6 +785,7 @@ function cleanup(): void {
 
   stopPipeline();
 
+  visibilityController?.dispose();
   trayManager?.destroy();
   overlay?.dispose();
   audioCapture?.dispose();
