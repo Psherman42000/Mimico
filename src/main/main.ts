@@ -28,7 +28,7 @@ import { Translator } from './translator';
 import { VoiceManager } from './voice-manager';
 import { AudioOutput } from './audio-output';
 import { TrayManager } from './tray';
-import { Overlay } from './overlay';
+import { NotchOverlay } from './notch-overlay';
 
 // ============================================================
 // Constantes do aplicativo
@@ -101,8 +101,8 @@ let audioOutput: AudioOutput;
 /** Gerenciador do ícone de bandeja */
 let trayManager: TrayManager;
 
-/** Janela overlay de legendas */
-let overlay: Overlay;
+/** Notch overlay (pílula expansível no topo-centro) */
+let overlay: NotchOverlay;
 
 /** Indica se o pipeline está ativo (capturando + transcrevendo) */
 let isPipelineActive = false;
@@ -338,7 +338,7 @@ function setupIPC(): void {
  * Aplica alterações de configuração nos módulos em tempo real.
  */
 function applyConfigChanges(): void {
-  // Atualiza opacidade do overlay
+  // Atualiza opacidade do notch
   overlay.setOpacity(config.overlayOpacity);
 
   // Atualiza chave da API DeepL
@@ -346,6 +346,16 @@ function applyConfigChanges(): void {
 
   // Atualiza mix mode (replace/overlay)
   audioOutput.setMixMode(config.voiceMixMode);
+  overlay.setMixMode(config.voiceMixMode);
+
+  // Atualiza modo no notch
+  overlay.setMode(config.appMode);
+
+  // Atualiza TTS provider no notch
+  overlay.setTtsProvider(config.ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Edge');
+
+  // Atualiza toggle de voz no notch
+  overlay.setVoiceActive(config.toggleVoice);
 
   // Se toggle voz mudou, inicia/para audio output + mic capture
   if (isPipelineActive) {
@@ -378,6 +388,7 @@ function registerGlobalShortcuts(): void {
       config.appMode = next;
       saveConfig({ appMode: next });
       restartPipeline();
+      overlay.setMode(next);
       trayManager.setMode(next);
       const label = next === 'voice' ? '🎤 Dublagem ativa' : '💬 Só legendas';
       trayManager.showNotification(APP_NAME, label);
@@ -386,7 +397,7 @@ function registerGlobalShortcuts(): void {
     }
   });
 
-  // Atalho para mostrar/esconder overlay
+  // Atalho para mostrar/esconder notch overlay
   globalShortcut.register(config.overlayHotkey, () => {
     if (overlay.isVisible()) {
       overlay.hide();
@@ -440,8 +451,8 @@ function initializeModules(): void {
   voiceManager = new VoiceManager('cli');
   audioOutput = new AudioOutput(config.vbcableDevice);
 
-  // Cria overlay
-  overlay = new Overlay();
+  // Cria notch overlay
+  overlay = new NotchOverlay();
 
   // Cria gerenciador de bandeja
   trayManager = new TrayManager();
@@ -525,6 +536,25 @@ function setupModuleListeners(): void {
   audioOutput.on('error', (error: Error) => {
     appLog(`Audio output error: ${error.message}`);
   });
+
+  // Notch overlay: callback de toggle de voz via IPC
+  overlay.onToggleVoice = (active: boolean) => {
+    config.toggleVoice = active;
+    saveConfig({ toggleVoice: active });
+    if (isPipelineActive) {
+      if (active) {
+        audioOutput.start().catch((err: Error) => {
+          appLog(`Failed to start audio output: ${err.message}`);
+        });
+        micCapture.start().catch((err: Error) => {
+          appLog(`Failed to start mic capture: ${err.message}`);
+        });
+      } else {
+        audioOutput.stop();
+        micCapture.stop();
+      }
+    }
+  };
 }
 
 // ============================================================
@@ -578,6 +608,7 @@ async function main(): Promise<void> {
       onSetMode: (mode) => {
         config.appMode = mode;
         saveConfig({ appMode: mode });
+        overlay.setMode(mode);
         restartPipeline();
       },
       onSettings: openSettings,

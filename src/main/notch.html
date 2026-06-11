@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #000000;
+    --surface: rgba(255,255,255,0.03);
+    --surface-hover: rgba(255,255,255,0.06);
+    --accent: #7c5cff;
+    --accent-bg: rgba(124,92,255,0.14);
+    --accent-border: rgba(124,92,255,0.28);
+    --accent-text: #b59cff;
+    --text-primary: rgba(255,255,255,0.9);
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-muted: rgba(255,255,255,0.35);
+    --dot-color: #00cc66;
+    --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --transition-ease: 0.25s ease;
+    --notch-collapsed-w: 300px;
+    --notch-collapsed-h: 34px;
+    --notch-expanded-w: 450px;
+    --notch-expanded-h: 320px;
+  }
+
+  body {
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .notch {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--notch-collapsed-w);
+    height: var(--notch-collapsed-h);
+    border-radius: 0 0 24px 24px;
+    background: var(--surface);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: none;
+    overflow: hidden;
+    transition:
+      width var(--transition-spring),
+      height var(--transition-spring),
+      border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+      background var(--transition-ease);
+    cursor: default;
+  }
+
+  .notch.expanded {
+    width: var(--notch-expanded-w);
+    height: var(--notch-expanded-h);
+    border-radius: 0 0 20px 20px;
+    background: var(--surface);
+  }
+
+  /* ── Collapsed state ── */
+  .notch-collapsed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+  .notch.expanded .notch-collapsed {
+    opacity: 0;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dot-color);
+    display: inline-block;
+    box-shadow: 0 0 6px rgba(0,204,102,0.5);
+    transition: background var(--transition-ease), box-shadow var(--transition-ease);
+  }
+  .dot.off { background: #666; box-shadow: none; }
+  .dot.listening { animation: pulse 1.5s ease-in-out infinite; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(0,204,102,0.3); }
+    50% { box-shadow: 0 0 12px rgba(0,204,102,0.8); }
+  }
+
+  .notch-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: 6px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ── Expanded state ── */
+  .notch-expanded {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    padding: 12px 14px 8px;
+  }
+  .notch.expanded .notch-expanded {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Status bar */
+  .notch-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 8px;
+    min-height: 20px;
+  }
+  .notch-status .dot {
+    width: 6px;
+    height: 6px;
+  }
+  .notch-status .mode-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .notch-status .spacer { flex: 1; }
+  .notch-status .tts-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-border);
+    color: var(--accent-text);
+  }
+  .notch-status .tts-badge.off {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.12);
+    color: var(--text-muted);
+  }
+
+  /* Translation feed */
+  .notch-feed {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+  .notch-feed::-webkit-scrollbar { width: 3px; }
+  .notch-feed::-webkit-scrollbar-track { background: transparent; }
+  .notch-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+  .feed-entry {
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    animation: fadeSlideIn 0.25s ease;
+  }
+  .feed-entry:last-child { border-bottom: none; }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .feed-en {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-bottom: 2px;
+  }
+  .feed-pt {
+    font-size: 14px;
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .feed-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  /* Tabs sidebar */
+  .notch-tabs {
+    display: flex;
+    gap: 2px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .notch-tab {
+    flex: 1;
+    padding: 6px 0;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background var(--transition-ease), color var(--transition-ease);
+    border: none;
+    background: transparent;
+  }
+  .notch-tab:hover {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+  }
+  .notch-tab.active {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    border: 1px solid var(--accent-border);
+  }
+
+  /* Tab content panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Controls tab */
+  .controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+  }
+  .controls-row label {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .controls-row .value {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+  .toggle-switch {
+    width: 32px; height: 18px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.12);
+    position: relative;
+    cursor: pointer;
+    transition: background var(--transition-ease);
+    flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--accent); }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: white;
+    transition: transform var(--transition-ease);
+  }
+  .toggle-switch.on::after { transform: translateX(14px); }
+
+  /* History tab */
+  .history-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 180px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  /* Status text */
+  .notch-connecting {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .notch-connecting.visible { display: flex; }
+  .spinner {
+    width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,0.12);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div class="notch" id="notch">
+    <!-- Collapsed state -->
+    <div class="notch-collapsed">
+      <span class="dot" id="collapsedDot"></span>
+      <span class="notch-label" id="collapsedLabel">MIMICO</span>
+    </div>
+
+    <!-- Expanded state -->
+    <div class="notch-expanded">
+      <!-- Status bar -->
+      <div class="notch-status">
+        <span class="dot" id="statusDot"></span>
+        <span class="mode-label" id="modeLabel">LEGENDAS</span>
+        <span class="spacer"></span>
+        <span class="tts-badge" id="ttsBadge">♫ Edge</span>
+      </div>
+
+      <!-- Feed -->
+      <div class="notch-feed" id="notchFeed">
+        <div class="feed-empty" id="feedEmpty">🎤 Aguardando áudio...</div>
+        <div id="feedContainer"></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="notch-tabs">
+        <button class="notch-tab active" data-tab="legendas">💬 Legendas</button>
+        <button class="notch-tab" data-tab="controles">🎮 Controles</button>
+        <button class="notch-tab" data-tab="historico">📋 Histórico</button>
+      </div>
+
+      <!-- Tab panels -->
+      <div class="tab-panel active" id="panel-legendas"></div>
+      <div class="tab-panel" id="panel-controles">
+        <div class="controls-row">
+          <label>🎤 Dublagem</label>
+          <div class="toggle-switch" id="voiceToggle"></div>
+          <span class="value" id="voiceStatus">OFF</span>
+        </div>
+        <div class="controls-row">
+          <label>🔊 Mix</label>
+          <span class="value" id="mixStatus">Replace</span>
+        </div>
+        <div class="controls-row">
+          <label>🎙 TTS</label>
+          <span class="value" id="ttsStatus">Edge</span>
+        </div>
+      </div>
+      <div class="tab-panel" id="panel-historico">
+        <div class="history-empty">Sessão atual vazia</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notch-connecting" id="connectingOverlay">
+    <div class="spinner"></div>
+    <span>Inicializando...</span>
+  </div>
+
+<script>
+  const { ipcRenderer } = require('electron');
+
+  const notch = document.getElementById('notch');
+  const collapsedDot = document.getElementById('collapsedDot');
+  const collapsedLabel = document.getElementById('collapsedLabel');
+  const statusDot = document.getElementById('statusDot');
+  const modeLabel = document.getElementById('modeLabel');
+  const ttsBadge = document.getElementById('ttsBadge');
+  const notchFeed = document.getElementById('notchFeed');
+  const feedContainer = document.getElementById('feedContainer');
+  const feedEmpty = document.getElementById('feedEmpty');
+  const connectingOverlay = document.getElementById('connectingOverlay');
+  const voiceToggle = document.getElementById('voiceToggle');
+  const voiceStatus = document.getElementById('voiceStatus');
+  const mixStatus = document.getElementById('mixStatus');
+  const ttsStatus = document.getElementById('ttsStatus');
+
+  let isExpanded = false;
+  let collapseTimer = null;
+  let currentMode = 'subtitles';
+  let voiceActive = false;
+  let mixMode = 'replace';
+  let ttsProvider = 'Edge';
+  let historyEntries = [];
+
+  // ── Tabs ──
+  document.querySelectorAll('.notch-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.notch-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = document.getElementById('panel-' + btn.dataset.tab);
+      if (panel) panel.classList.add('active');
+    });
+  });
+
+  // ── Voice toggle click ──
+  voiceToggle.addEventListener('click', () => {
+    const newVal = !voiceActive;
+    ipcRenderer.send('notch-toggle-voice', newVal);
+  });
+
+  // ── Expand / Collapse ──
+  function expand() {
+    isExpanded = true;
+    notch.classList.add('expanded');
+    if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
+  }
+
+  function collapse() {
+    isExpanded = false;
+    notch.classList.remove('expanded');
+  }
+
+  function scheduleCollapse(delayMs) {
+    if (collapseTimer) clearTimeout(collapseTimer);
+    collapseTimer = setTimeout(() => { collapse(); }, delayMs);
+  }
+
+  // Auto-expand on translation, auto-collapse after 5s silence
+  let lastFeedTs = 0;
+  function pushTranslation(en, pt) {
+    const now = Date.now();
+    lastFeedTs = now;
+
+    // Remove empty placeholder
+    feedEmpty.style.display = 'none';
+
+    const entry = document.createElement('div');
+    entry.className = 'feed-entry';
+    entry.innerHTML = `<div class="feed-en">${escapeHtml(en)}</div><div class="feed-pt">${escapeHtml(pt)}</div>`;
+    feedContainer.appendChild(entry);
+
+    // Keep last 20 entries
+    while (feedContainer.children.length > 20) {
+      feedContainer.removeChild(feedContainer.firstChild);
+    }
+
+    // Scroll to bottom
+    notchFeed.scrollTop = notchFeed.scrollHeight;
+
+    // Auto-expand
+    if (!isExpanded) expand();
+
+    // Schedule collapse after 5s silence
+    scheduleCollapse(5000);
+
+    // Also save to history
+    historyEntries.push({ en, pt, ts: now });
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── IPC Handlers ──
+  ipcRenderer.on('notch-translation', (_event, data) => {
+    pushTranslation(data.en, data.pt);
+  });
+
+  ipcRenderer.on('notch-clear', () => {
+    feedContainer.innerHTML = '';
+    feedEmpty.style.display = 'flex';
+    historyEntries = [];
+    scheduleCollapse(200);
+  });
+
+  ipcRenderer.on('notch-mode', (_event, mode) => {
+    currentMode = mode;
+    const labels = { off: 'OFF', subtitles: 'LEGENDAS', voice: 'DUBLAGEM' };
+    modeLabel.textContent = labels[mode] || 'LEGENDAS';
+    collapsedLabel.textContent = labels[mode] || 'MIMICO';
+
+    // Dot color
+    const isActive = mode !== 'off';
+    collapsedDot.className = isActive ? 'dot listening' : 'dot off';
+    statusDot.className = isActive ? 'dot listening' : 'dot off';
+  });
+
+  ipcRenderer.on('notch-tts', (_event, provider) => {
+    ttsProvider = provider;
+    ttsBadge.textContent = '♫ ' + provider;
+    ttsBadge.className = 'tts-badge' + (provider === 'off' ? ' off' : '');
+    ttsStatus.textContent = provider;
+  });
+
+  ipcRenderer.on('notch-voice', (_event, active) => {
+    voiceActive = active;
+    voiceToggle.className = 'toggle-switch' + (active ? ' on' : '');
+    voiceStatus.textContent = active ? 'ON' : 'OFF';
+  });
+
+  ipcRenderer.on('notch-mix', (_event, mode) => {
+    mixMode = mode;
+    mixStatus.textContent = mode === 'replace' ? 'Replace' : 'Overlay';
+  });
+
+  ipcRenderer.on('notch-connecting', (_event, visible) => {
+    connectingOverlay.className = 'notch-connecting' + (visible ? ' visible' : '');
+  });
+
+  // ── Click on notch pill toggles expand ──
+  // When collapsed, clicking anywhere expands
+  // Click on notch-collapsed area
+  document.querySelector('.notch-collapsed')?.addEventListener('click', () => {
+    if (!isExpanded) { expand(); }
+  });
+
+  // Prevent collapse when clicking inside expanded area (on content)
+  document.querySelector('.notch-expanded')?.addEventListener('click', (e) => {
+    // Don't propagate
+  });
+
+  // ── Initial state ──
+  ipcRenderer.on('notch-init', (_event, state) => {
+    if (state.mode) {
+      currentMode = state.mode;
+      const labels = { off: 'OFF', subtitles: 'LEGENDAS', voice: 'DUBLAGEM' };
+      modeLabel.textContent = labels[state.mode] || 'LEGENDAS';
+      collapsedLabel.textContent = labels[state.mode] || 'MIMICO';
+      const isActive = state.mode !== 'off';
+      collapsedDot.className = isActive ? 'dot listening' : 'dot off';
+      statusDot.className = isActive ? 'dot listening' : 'dot off';
+    }
+    if (state.ttsProvider) {
+      ttsBadge.textContent = '♫ ' + state.ttsProvider;
+      ttsStatus.textContent = state.ttsProvider;
+    }
+    if (state.voiceActive !== undefined) {
+      voiceActive = state.voiceActive;
+      voiceToggle.className = 'toggle-switch' + (state.voiceActive ? ' on' : '');
+      voiceStatus.textContent = state.voiceActive ? 'ON' : 'OFF';
+    }
+    if (state.mixMode) {
+      mixStatus.textContent = state.mixMode === 'replace' ? 'Replace' : 'Overlay';
+    }
+  });
+</script>
+</body>
+</html>
