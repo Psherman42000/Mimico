@@ -11,15 +11,30 @@ import * as path from 'path';
 
 /** Interface que define o schema de configuração do Mimico */
 export interface Config {
+  // ── Modos ──
+  /** Modo de operação: off (desligado), subtitles (só legendas), voice (legend + dublagem) */
+  appMode: 'off' | 'subtitles' | 'voice';
+  /** Mix de voz: replace (muta original) ou overlay (original + tradução) */
+  voiceMixMode: 'replace' | 'overlay';
+
+  // ── API Keys ──
   /** Chave de autenticação da API DeepL */
   deepKey: string;
+  /** Chave de autenticação da API ElevenLabs */
+  elevenLabsKey: string;
+  /** ID da voz ElevenLabs */
+  elevenLabsVoiceId: string;
+  /** Modelo ElevenLabs (eleven_flash_v2_5, eleven_multilingual_v2, eleven_turbo_v2_5) */
+  elevenLabsModel: string;
+
+  // ── Preferências ──
   /** Idioma alvo para tradução (código ISO, ex: 'PT', 'EN', 'ES', 'FR', 'DE') */
   language: string;
   /** Atalho global para ligar/desligar a captura */
   toggleHotkey: string;
   /** Atalho global para mostrar/esconder o overlay */
   overlayHotkey: string;
-  /** Habilitar síntese de voz via Edge TTS */
+  /** Habilitar síntese de voz via TTS */
   toggleVoice: boolean;
   /** Opacidade da janela overlay (0.0 = invisível, 1.0 = opaco) */
   overlayOpacity: number;
@@ -27,11 +42,23 @@ export interface Config {
   vbcableDevice: string;
   /** Tamanho do modelo Whisper (tiny, base, small, medium, large) */
   whisperModelSize: string;
+  /** Provedor TTS: 'edge' (local) ou 'elevenlabs' (API) */
+  ttsProvider: 'edge' | 'elevenlabs';
 }
 
 /** Valores padrão para a configuração */
 const DEFAULTS: Config = {
+  // Modos
+  appMode: 'subtitles',
+  voiceMixMode: 'replace',
+
+  // API Keys
   deepKey: '',
+  elevenLabsKey: '',
+  elevenLabsVoiceId: '',
+  elevenLabsModel: 'eleven_flash_v2_5',
+
+  // Preferências
   language: 'PT',
   toggleHotkey: 'Alt+Shift+M',
   overlayHotkey: 'Alt+Shift+O',
@@ -39,6 +66,7 @@ const DEFAULTS: Config = {
   overlayOpacity: 0.85,
   vbcableDevice: 'CABLE Input',
   whisperModelSize: 'tiny',
+  ttsProvider: 'edge',
 };
 
 /** Caminho do arquivo de configuração */

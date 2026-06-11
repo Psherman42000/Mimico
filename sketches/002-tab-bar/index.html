@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mimico — Ajustes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d0d;
+    --surface: #1a1a1a;
+    --surface2: #2a2a2a;
+    --surface3: #333;
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --text: #f1f1f1;
+    --text-dim: #999;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --radius: 10px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh; display: flex; flex-direction: column;
+    overflow: hidden; user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Titlebar */
+  .titlebar {
+    height: 42px; background: var(--surface);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,.06);
+    -webkit-app-region: drag;
+  }
+  .titlebar-brand { font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+  .titlebar-brand em { color: var(--accent); font-style: normal; }
+  .titlebar-actions { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+  .titlebar-btn {
+    width: 30px; height: 22px; border: none; background: transparent;
+    color: var(--text-dim); cursor: pointer; border-radius: 4px;
+    font-size: 13px; display: flex; align-items: center; justify-content: center;
+  }
+  .titlebar-btn:hover { background: rgba(255,255,255,.08); color: var(--text); }
+  .titlebar-btn.close:hover { background: var(--danger); color: #fff; }
+
+  /* Tab bar */
+  .tabs {
+    display: flex; background: var(--surface);
+    padding: 0 8px; gap: 2px; border-bottom: 1px solid rgba(255,255,255,.06);
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 16px; border: none; background: transparent;
+    color: var(--text-dim); font-size: 12px; font-weight: 500;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    white-space: nowrap; transition: all .15s;
+  }
+  .tab:hover { color: var(--text); background: rgba(255,255,255,.03); }
+  .tab.active {
+    color: var(--accent); border-bottom-color: var(--accent);
+  }
+
+  /* Content */
+  .wrapper { display: flex; flex: 1; overflow: hidden; }
+  .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .section h2 { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .section > p { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid rgba(255,255,255,.06);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+  }
+  .card-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); margin-bottom: 12px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group:last-child { margin-bottom: 0; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 4px; }
+  .form-group input, .form-group select {
+    width: 100%; padding: 7px 10px; font-size: 13px;
+    background: var(--surface2); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 6px; color: var(--text); outline: none;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,.2); }
+  .form-row { display: flex; gap: 10px; }
+  .form-row .form-group { flex: 1; }
+  .form-hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;
+  }
+  .badge.green { background: rgba(34,197,94,.12); color: var(--success); }
+  .badge.red { background: rgba(239,68,68,.12); color: var(--danger); }
+  .badge.gray { background: rgba(255,255,255,.06); color: var(--text-dim); }
+
+  /* TTS toggle chips */
+  .chip-group { display: flex; gap: 6px; margin-bottom: 12px; }
+  .chip {
+    padding: 6px 14px; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 20px; background: transparent; color: var(--text-dim);
+    font-size: 12px; cursor: pointer; transition: all .15s;
+  }
+  .chip.active { border-color: var(--accent); background: rgba(99,102,241,.12); color: var(--accent); }
+  .chip:hover:not(.active) { border-color: rgba(255,255,255,.2); color: var(--text); }
+
+  /* Status bar */
+  .statusbar {
+    height: 28px; background: var(--surface);
+    border-top: 1px solid rgba(255,255,255,.06);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; font-size: 11px; color: var(--text-dim);
+  }
+  .statusbar .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .statusbar .dot.green { background: var(--success); }
+  .statusbar-right { display: flex; gap: 16px; }
+  .actions {
+    display: flex; gap: 6px;
+  }
+  .btn {
+    padding: 6px 16px; border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 500; cursor: pointer; transition: all .12s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid rgba(255,255,255,.08); }
+  .btn-ghost:hover { background: rgba(255,255,255,.05); color: var(--text); }
+  .btn-danger { background: transparent; color: var(--danger); }
+  .btn-danger:hover { background: rgba(239,68,68,.1); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-brand"><em>mimico</em> / config</div>
+  <div class="titlebar-actions">
+    <button class="titlebar-btn" onclick="window.mimicoAPI?.minimize()">─</button>
+    <button class="titlebar-btn close" onclick="window.mimicoAPI?.close()">✕</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="audio" onclick="switchTab('audio')">🔊 Áudio</button>
+  <button class="tab" data-tab="legendas" onclick="switchTab('legendas')">💬 Legendas</button>
+  <button class="tab" data-tab="transcricao" onclick="switchTab('transcricao')">📝 Transcrição</button>
+  <button class="tab" data-tab="traducao" onclick="switchTab('traducao')">🌐 Tradução</button>
+  <button class="tab" data-tab="voz" onclick="switchTab('voz')">🗣️ TTS</button>
+  <button class="tab" data-tab="sobre" onclick="switchTab('sobre')">ℹ️ Sobre</button>
+</div>
+
+<div class="wrapper">
+  <main class="content">
+
+    <!-- ÁUDIO -->
+    <div class="section active" id="tab-audio">
+      <h2>Áudio</h2>
+      <p>Dispositivos de entrada/saída e microfone virtual</p>
+      <div class="card">
+        <div class="card-title">Microfone Virtual</div>
+        <div class="form-group">
+          <label>Dispositivo VB-Cable</label>
+          <select><option>CABLE Input (VB-Audio Virtual Cable)</option></select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Pipeline B — Tradução de Voz</div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px">
+          <label style="margin:0;cursor:pointer">
+            <input type="checkbox" checked> Habilitar voz traduzida
+          </label>
+          <span class="badge green">● Ativo</span>
+        </div>
+        <div class="form-hint" style="margin-top:6px">Sua voz em PT → traduzida para EN → injetada no Meet/Discord via VB-Cable</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Dispositivos</div>
+        <div class="form-hint" style="line-height:2">
+          🎤 Microfone: <span class="badge green">Conectado</span> — Realtek Audio<br>
+          🔊 Sistema: <span class="badge green">OK</span> — WASAPI Loopback<br>
+          🔌 VB-Cable: <span class="badge green">Conectado</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEGENDAS -->
+    <div class="section" id="tab-legendas">
+      <h2>Legendas</h2>
+      <p>Janela transparente sobreposta</p>
+      <div class="card">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Opacidade</label>
+            <input type="range" min="10" max="100" value="85" style="width:100%;accent-color:var(--accent)">
+          </div>
+          <div class="form-group">
+            <label>Idioma alvo</label>
+            <select><option>🇧🇷 Português (PT)</option><option>🇺🇸 Inglês (EN)</option><option>🇪🇸 Espanhol (ES)</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Atalhos de teclado</div>
+        <div class="form-row">
+          <div class="form-group"><label>Mostrar/Esconder overlay</label><input value="Alt+Shift+O"></div>
+          <div class="form-group"><label>Ligar/Desligar captura</label><input value="Alt+Shift+M"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Preview</div>
+        <div style="background:#000;border-radius:6px;padding:10px 14px;font-size:13px">
+          <div style="color:#00ffff">What time is the meeting tomorrow?</div>
+          <div style="color:#00ff00;font-weight:600;font-size:16px;margin-top:3px">Que horas é a reunião amanhã?</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSCRIÇÃO -->
+    <div class="section" id="tab-transcricao">
+      <h2>Transcrição</h2>
+      <p>Faster-Whisper — reconhecimento de fala local</p>
+      <div class="card">
+        <div class="form-group">
+          <label>Modelo</label>
+          <select>
+            <option selected>tiny — rápido, ~1GB VRAM</option>
+            <option>base — ~1.5GB VRAM</option>
+            <option>small — ~2GB VRAM</option>
+          </select>
+          <div class="form-hint">GPU: GTX 1050 4GB — tiny é o ideal</div>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px">
+          <label style="margin:0;cursor:pointer"><input type="checkbox" checked> Usar GPU (CUDA)</label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Desempenho</div>
+        <span class="badge green">● Modelo carregado</span>
+        <span style="margin-left:8px">Latência: ~200ms</span>
+      </div>
+    </div>
+
+    <!-- TRADUÇÃO -->
+    <div class="section" id="tab-traducao">
+      <h2>Tradução</h2>
+      <p>DeepL API — tradução automática</p>
+      <div class="card">
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" placeholder="Insira sua chave DeepL..." value="••••••••••">
+          <div class="form-hint">Free: 500k caracteres/mês — <a href="#" style="color:var(--accent)">deepl.com/pro-api</a></div>
+        </div>
+        <div class="card" style="border-color:rgba(34,197,94,.2);padding:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span>Usado este mês:</span>
+            <span>12.450 / 500.000 <span class="badge green">2%</span></span>
+          </div>
+          <div style="margin-top:6px;height:4px;background:var(--surface3);border-radius:2px">
+            <div style="width:2.5%;height:100%;background:var(--success);border-radius:2px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TTS -->
+    <div class="section" id="tab-voz">
+      <h2>Texto-para-Fala</h2>
+      <p>Motor de síntese de voz para o Pipeline B</p>
+      <div class="card">
+        <div class="card-title">Provedor</div>
+        <div class="chip-group">
+          <button class="chip active" onclick="toggleProvider('edge', this)">🔊 Edge TTS</button>
+          <button class="chip" onclick="toggleProvider('elevenlabs', this)">✨ ElevenLabs</button>
+        </div>
+        <div id="edge-panel">
+          <div class="form-hint" style="line-height:1.8">
+            ✅ Gratuito, sem chave<br>
+            🌐 PT-BR, EN-US, ES, FR, DE, JA, ZH<br>
+            ⚡ Latência ~1s
+          </div>
+        </div>
+        <div id="eleven-panel" style="display:none">
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="password" placeholder="sk_..." id="elevenKey">
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:2">
+              <label>Voz</label>
+              <select disabled><option>— Insira a API Key —</option></select>
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>Modelo</label>
+              <select>
+                <option>Flash v2.5 (75ms)</option>
+                <option selected>Multilingual v2</option>
+                <option>Turbo v2.5</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-ghost" style="margin-top:4px">🔄 Carregar vozes disponíveis</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOBRE -->
+    <div class="section" id="tab-sobre">
+      <h2>Sobre</h2>
+      <p>Mimico v1.0.0</p>
+      <div class="card">
+        <div class="card-title">Workers</div>
+        <div class="form-hint" style="line-height:2">
+          🎤 Audio Capture <span class="badge green">● Running</span><br>
+          🎙️ Mic Capture <span class="badge green">● Running</span><br>
+          🧠 Whisper <span class="badge green">● Ready</span><br>
+          🌐 DeepL <span class="badge green">● Connected</span><br>
+          🗣️ TTS <span class="badge green">● Edge TTS</span><br>
+          🔌 VB-Cable <span class="badge green">● Available</span>
+        </div>
+      </div>
+      <div class="card">
+        <button class="btn btn-ghost" style="width:100%">📂 Abrir logs</button>
+      </div>
+      <div class="card" style="border-color:rgba(239,68,68,.2)">
+        <button class="btn btn-danger" style="width:100%" onclick="if(confirm('Tem certeza?')) window.mimicoAPI?.quit()">⏻ Encerrar Mimico</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="statusbar">
+  <div><span class="dot green"></span> Pipeline ativo</div>
+  <div class="statusbar-right">
+    <span>TTS: Edge</span>
+    <span>Whisper: tiny (GPU)</span>
+    <span style="color:var(--accent);cursor:pointer" onclick="switchTab('voz')">Configurar →</span>
+  </div>
+</div>
+
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${id}"]`).classList.add('active');
+}
+function toggleProvider(provider, btn) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('edge-panel').style.display = provider === 'edge' ? 'block' : 'none';
+  document.getElementById('eleven-panel').style.display = provider === 'elevenlabs' ? 'block' : 'none';
+}
+// Fallback API
+if (typeof window.mimicoAPI === 'undefined') {
+  window.mimicoAPI = { minimize:()=>{}, close:()=>{}, quit:()=>{} };
+}
+</script>
+</body>
+</html>

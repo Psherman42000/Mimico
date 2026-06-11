@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mimico</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #08090a;
+    --panel: #0f1011;
+    --surface: #191a1b;
+    --border: rgba(255,255,255,0.06);
+    --border-card: rgba(255,255,255,0.08);
+    --text: #f7f8f8;
+    --text-secondary: #d0d6e0;
+    --text-tertiary: #8a8f98;
+    --text-muted: #62666d;
+    --accent: #5e6ad2;
+    --accent-hover: #7170ff;
+    --green: #10b981;
+    --radius: 6px;
+    --sidebar-w: 48px;
+    --header-h: 42px;
+  }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv01', 'ss03';
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh; display: flex; flex-direction: column;
+    overflow: hidden; user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  .titlebar {
+    height: var(--header-h); background: var(--panel);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; -webkit-app-region: drag;
+    border-bottom: 1px solid var(--border);
+  }
+  .titlebar-brand { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+  .titlebar-brand em { color: var(--accent); font-style: normal; font-weight: 600; }
+  .titlebar-actions { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+  .tb-btn {
+    width: 28px; height: 22px; border: none; background: transparent;
+    color: var(--text-muted); cursor: pointer; border-radius: 4px;
+    font-size: 12px; display: flex; align-items: center; justify-content: center;
+  }
+  .tb-btn:hover { background: rgba(255,255,255,.06); color: var(--text); }
+  .tb-btn.close:hover { background: #ef4444; color: #fff; }
+  .body { display: flex; flex: 1; overflow: hidden; }
+  .sidebar {
+    width: var(--sidebar-w); background: var(--panel);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 0; border-right: 1px solid var(--border);
+  }
+  .side-btn {
+    width: 34px; height: 34px; border: none; background: transparent;
+    border-radius: var(--radius); cursor: pointer;
+    color: var(--text-muted); font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .12s;
+  }
+  .side-btn:hover { background: rgba(255,255,255,.04); color: var(--text-secondary); }
+  .side-btn.active { background: rgba(94,106,210,.15); color: var(--accent); }
+  .side-btn.danger:hover { background: rgba(239,68,68,.12); color: #ef4444; }
+  .side-spacer { flex: 1; }
+  .content { flex: 1; overflow-y: auto; }
+  .section { display: none; padding: 20px 24px; }
+  .section.active { display: block; }
+  .section-header { margin-bottom: 16px; }
+  .section-header h2 { font-size: 15px; font-weight: 500; color: var(--text); }
+  .section-header p { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+  .card {
+    background: rgba(255,255,255,.02);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .4px; color: var(--text-muted); margin-bottom: 10px;
+  }
+  .mode-group { display: flex; gap: 4px; }
+  .mode-opt {
+    flex: 1; padding: 8px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: transparent;
+    color: var(--text-muted); cursor: pointer; text-align: center;
+    transition: all .12s; font-size: 11px; line-height: 1.3;
+  }
+  .mode-opt .icon { font-size: 16px; display: block; margin-bottom: 3px; }
+  .mode-opt .label { font-weight: 500; color: var(--text-tertiary); }
+  .mode-opt.active { border-color: var(--accent); background: rgba(94,106,210,.1); }
+  .mode-opt.active .label { color: var(--text); }
+  .mode-opt:hover:not(.active) { border-color: rgba(255,255,255,.15); }
+  .feed { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .f-item {
+    padding: 8px 10px; border-radius: 4px;
+    background: rgba(255,255,255,.02);
+    border-left: 2px solid var(--accent);
+  }
+  .f-item.mic { border-left-color: #f59e0b; }
+  .f-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+  .f-en { font-size: 12px; color: var(--text-tertiary); }
+  .f-pt { font-size: 13px; color: var(--text); font-weight: 500; }
+  .f-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 24px 0; }
+  .f-group { margin-bottom: 10px; }
+  .f-group:last-child { margin-bottom: 0; }
+  .f-group label { display: block; font-size: 11px; font-weight: 500; color: var(--text-muted); margin-bottom: 3px; }
+  .f-group input, .f-group select {
+    width: 100%; padding: 6px 10px; font-size: 13px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); outline: none;
+  }
+  .f-group input:focus, .f-group select:focus { border-color: var(--accent); }
+  .f-row { display: flex; gap: 10px; }
+  .f-row .f-group { flex: 1; }
+  .f-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .f-group.cb { display: flex; align-items: center; gap: 6px; }
+  .f-group.cb input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+  .f-group.cb label { margin: 0; cursor: pointer; }
+  .badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 500; }
+  .badge.green { background: rgba(16,185,129,.12); color: var(--green); }
+  .badge.gray { background: rgba(255,255,255,.05); color: var(--text-muted); }
+  .status-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .statusbar {
+    height: 26px; background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; font-size: 11px; color: var(--text-muted);
+  }
+  .statusbar .dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .statusbar .dot.g { background: var(--green); }
+  .statusbar-right { display: flex; gap: 12px; }
+  .statusbar-right .link { color: var(--accent); cursor: pointer; }
+  .statusbar-right .link:hover { color: var(--accent-hover); }
+  .actions {
+    display: flex; gap: 6px; justify-content: flex-end;
+    padding: 10px 24px; background: var(--panel);
+    border-top: 1px solid var(--border);
+  }
+  .btn {
+    padding: 6px 14px; border: none; border-radius: var(--radius);
+    font-size: 12px; font-weight: 500; cursor: pointer; transition: all .12s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--text-tertiary); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: rgba(255,255,255,.04); color: var(--text); }
+  .chip-group { display: flex; gap: 4px; margin-bottom: 8px; }
+  .chip {
+    padding: 5px 12px; border: 1px solid var(--border);
+    border-radius: 14px; background: transparent; color: var(--text-muted);
+    font-size: 11px; cursor: pointer; transition: all .12s;
+  }
+  .chip.active { border-color: var(--accent); background: rgba(94,106,210,.1); color: var(--accent); }
+  .chip:hover:not(.active) { border-color: rgba(255,255,255,.2); color: var(--text-secondary); }
+  .mix-group { display: flex; gap: 4px; }
+  .mix-opt {
+    flex: 1; padding: 6px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: transparent;
+    color: var(--text-muted); cursor: pointer; text-align: center;
+    font-size: 11px; transition: all .12s;
+  }
+  .mix-opt .sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .mix-opt.active { border-color: var(--accent); background: rgba(94,106,210,.1); color: var(--text); }
+  .mix-opt:hover:not(.active) { border-color: rgba(255,255,255,.15); }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 2px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-brand"><em>mimico</em> / config</div>
+  <div class="titlebar-actions">
+    <button class="tb-btn" onclick="mimico.minimize()">─</button>
+    <button class="tb-btn close" onclick="mimico.close()">✕</button>
+  </div>
+</div>
+
+<div class="body">
+  <nav class="sidebar">
+    <button class="side-btn active" data-s="painel" onclick="go('painel')" title="Painel">⌂</button>
+    <button class="side-btn" data-s="audio" onclick="go('audio')" title="Áudio">♪</button>
+    <button class="side-btn" data-s="legendas" onclick="go('legendas')" title="Legendas">◧</button>
+    <button class="side-btn" data-s="transcricao" onclick="go('transcricao')" title="Transcrição">✎</button>
+    <button class="side-btn" data-s="traducao" onclick="go('traducao')" title="Tradução">⇄</button>
+    <button class="side-btn" data-s="voz" onclick="go('voz')" title="Voz">♫</button>
+    <div class="side-spacer"></div>
+    <button class="side-btn" data-s="sobre" onclick="go('sobre')" title="Sobre">ⓘ</button>
+    <button class="side-btn danger" onclick="if(confirm('Encerrar Mimico?')) mimico.quit()" title="Sair">⏻</button>
+  </nav>
+
+  <main class="content">
+
+    <!-- PAINEL -->
+    <div class="section active" id="s-painel">
+      <div class="section-header"><h2>Painel</h2><p>Status e traduções ao vivo</p></div>
+      <div class="card">
+        <div class="card-title">Modo</div>
+        <div class="mode-group">
+          <div class="mode-opt" onclick="ui.setMode('off',this)">
+            <span class="icon">⏹</span>
+            <div class="label">Off</div>
+          </div>
+          <div class="mode-opt active" onclick="ui.setMode('subtitles',this)">
+            <span class="icon">◧</span>
+            <div class="label">Legendas</div>
+          </div>
+          <div class="mode-opt" onclick="ui.setMode('voice',this)">
+            <span class="icon">🎤</span>
+            <div class="label">Voz</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="status-row">
+          <span class="badge green">● Audio</span>
+          <span class="badge green">● Whisper</span>
+          <span class="badge green">● DeepL</span>
+          <span class="badge green">● TTS</span>
+          <span class="badge green">● VB-Cable</span>
+          <span class="badge gray">Latência 1.2s</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Traduções ao vivo</div>
+        <div class="feed">
+          <div class="f-item mic">
+            <div class="f-meta"><span>📍 Microfone → EN</span><span>10:32:15</span></div>
+            <div class="f-en">"The proposal needs approval from the board"</div>
+            <div class="f-pt">"A proposta precisa de aprovação do conselho"</div>
+          </div>
+          <div class="f-item">
+            <div class="f-meta"><span>💻 Sistema</span><span>10:32:12</span></div>
+            <div class="f-en">"I agree, but we should check the numbers first"</div>
+            <div class="f-pt">"Concordo, mas devemos verificar os números primeiro"</div>
+          </div>
+          <div class="f-item mic">
+            <div class="f-meta"><span>📍 Microfone → EN</span><span>10:32:08</span></div>
+            <div class="f-en">"What's the deadline for this project?"</div>
+            <div class="f-pt">"Qual é o prazo para este projeto?"</div>
+          </div>
+          <div class="f-item">
+            <div class="f-meta"><span>💻 Sistema</span><span>10:32:05</span></div>
+            <div class="f-en">"The deadline is next Friday, June 19"</div>
+            <div class="f-pt">"O prazo é sexta-feira, 19 de junho"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ÁUDIO -->
+    <div class="section" id="s-audio">
+      <div class="section-header"><h2>Áudio</h2><p>Microfone virtual e mix de voz</p></div>
+      <div class="card">
+        <div class="card-title">VB-Cable</div>
+        <div class="f-group">
+          <label>Dispositivo de saída</label>
+          <select><option>CABLE Input (VB-Audio Virtual Cable)</option></select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Mix de voz</div>
+        <div class="mix-group">
+          <div class="mix-opt active" onclick="ui.setMix('replace',this)">
+            <div>🔇 Substituir</div>
+            <div class="sub">Sua voz mutada, só inglês</div>
+          </div>
+          <div class="mix-opt" onclick="ui.setMix('overlay',this)">
+            <div>🔊 Sobrepor</div>
+            <div class="sub">Voz original + tradução</div>
+          </div>
+        </div>
+        <div class="f-hint">"Substituir" para calls formais, "Sobrepor" para informais.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Dispositivos</div>
+        <div class="f-hint" style="line-height:2">
+          🎤 Microfone: <span class="badge green">● OK</span> — Realtek Audio<br>
+          🔊 Sistema: <span class="badge green">● OK</span> — WASAPI Loopback<br>
+          🔌 VB-Cable: <span class="badge green">● Conectado</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEGENDAS -->
+    <div class="section" id="s-legendas">
+      <div class="section-header"><h2>Legendas</h2><p>Overlay transparente</p></div>
+      <div class="card">
+        <div class="card-title">Visibilidade</div>
+        <div class="f-group cb">
+          <input type="checkbox" id="hideshare">
+          <label for="hideshare">Esconder durante compartilhamento de tela</label>
+        </div>
+        <div class="f-hint">Atalho: <kbd style="background:rgba(255,255,255,.06);padding:0 4px;border-radius:2px">Alt+Shift+H</kbd></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Aparência</div>
+        <div class="f-row">
+          <div class="f-group">
+            <label>Opacidade</label>
+            <input type="range" min="10" max="100" value="85" style="width:100%;accent-color:var(--accent)">
+          </div>
+          <div class="f-group">
+            <label>Idioma alvo</label>
+            <select><option>🇧🇷 Português</option><option>🇺🇸 Inglês</option></select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Atalhos</div>
+        <div class="f-row">
+          <div class="f-group"><label>Mostrar/Esconder overlay</label><input value="Alt+Shift+H"></div>
+          <div class="f-group"><label>Ligar/Desligar captura</label><input value="Alt+Shift+M"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSCRIÇÃO -->
+    <div class="section" id="s-transcricao">
+      <div class="section-header"><h2>Transcrição</h2><p>Faster-Whisper</p></div>
+      <div class="card">
+        <div class="f-group">
+          <label>Modelo</label>
+          <select><option selected>tiny — ~1GB VRAM</option><option>base — ~1.5GB</option><option>small — ~2GB</option></select>
+          <div class="f-hint">GTX 1050 4GB → tiny recomendado</div>
+        </div>
+        <div class="f-group cb"><input type="checkbox" id="gpu" checked><label for="gpu">GPU (CUDA)</label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Status</div>
+        <span class="badge green">● Modelo carregado</span>
+        <span style="margin-left:6px;color:var(--text-muted);font-size:11px;">Latência ~200ms</span>
+      </div>
+    </div>
+
+    <!-- TRADUÇÃO -->
+    <div class="section" id="s-traducao">
+      <div class="section-header"><h2>Tradução</h2><p>DeepL API</p></div>
+      <div class="card">
+        <div class="f-group">
+          <label>API Key</label>
+          <input type="password" placeholder="••••••••••">
+          <div class="f-hint">Free: 500k chars/mês — <a href="#" style="color:var(--accent);text-decoration:none">deepl.com/pro-api</a></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+            <span>Uso mensal</span><span>12.450 / 500k</span>
+          </div>
+          <div style="margin-top:4px;height:3px;background:rgba(255,255,255,.06);border-radius:2px">
+            <div style="width:2.5%;height:100%;background:var(--accent);border-radius:2px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VOZ -->
+    <div class="section" id="s-voz">
+      <div class="section-header"><h2>Voz (TTS)</h2><p>Motor de síntese de fala</p></div>
+      <div class="card">
+        <div class="card-title">Provedor</div>
+        <div class="chip-group">
+          <div class="chip active" onclick="ui.setTTS('edge',this)">🔊 Edge TTS</div>
+          <div class="chip" onclick="ui.setTTS('eleven',this)">✨ ElevenLabs</div>
+        </div>
+        <div id="edge-panel">
+          <div class="f-hint">✅ Gratuito • PT-BR, EN-US, ES, FR, DE • ~1s latência</div>
+        </div>
+        <div id="eleven-panel" style="display:none">
+          <div class="f-group"><label>API Key</label><input type="password" placeholder="sk_..."></div>
+          <div class="f-row">
+            <div class="f-group"><label>Voz</label><select disabled><option>— Insira a chave —</option></select></div>
+            <div class="f-group"><label>Modelo</label><select><option>Flash v2.5 (75ms)</option><option selected>Multilingual v2</option></select></div>
+          </div>
+          <div class="f-hint"><a href="#" style="color:var(--accent);text-decoration:none">elevenlabs.io</a> — ~$5/mês</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOBRE -->
+    <div class="section" id="s-sobre">
+      <div class="section-header"><h2>Sobre</h2><p>Mimico v1.0.0</p></div>
+      <div class="card">
+        <div class="card-title">Workers</div>
+        <div style="font-size:12px;color:var(--text-tertiary);line-height:1.8">
+          🎤 Audio Capture <span class="badge green">● Running</span><br>
+          🎙️ Mic Capture <span class="badge green">● Running</span><br>
+          🧠 Whisper <span class="badge green">● Ready</span><br>
+          🌐 DeepL <span class="badge green">● Connected</span><br>
+          🗣️ TTS <span class="badge green">● Edge</span><br>
+          🔌 VB-Cable <span class="badge green">● Available</span>
+        </div>
+      </div>
+      <div class="card">
+        <button class="btn btn-ghost" style="width:100%" onclick="alert('Abrindo logs...')">📂 Abrir logs</button>
+      </div>
+      <div class="card" style="border-color:rgba(239,68,68,.15)">
+        <button class="btn btn-ghost" style="width:100%;color:#ef4444" onclick="if(confirm('Encerrar Mimico?')) mimico.quit()">⏻ Encerrar</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="statusbar">
+  <div><span class="dot g"></span> Online · Legendas</div>
+  <div class="statusbar-right">
+    <span>TTS: Edge</span>
+    <span>Whisper: tiny GPU</span>
+    <span class="link" onclick="ui.go('voz')">Configurar →</span>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="btn btn-ghost" onclick="mimico.close()">Cancelar</button>
+  <button class="btn btn-primary" onclick="ui.save()">Salvar</button>
+</div>
+
+<script>
+const ui = {
+  go(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('s-'+id).classList.add('active');
+    document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.side-btn[data-s="${id}"]`).classList.add('active');
+  },
+  setMode(mode, el) {
+    document.querySelectorAll('.mode-opt').forEach(m => m.classList.remove('active'));
+    el.classList.add('active');
+  },
+  setMix(mode, el) {
+    document.querySelectorAll('.mix-opt').forEach(m => m.classList.remove('active'));
+    el.classList.add('active');
+  },
+  setTTS(provider, el) {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('edge-panel').style.display = provider==='edge'?'block':'none';
+    document.getElementById('eleven-panel').style.display = provider==='eleven'?'block':'none';
+  },
+  save() {
+    const btn = document.querySelector('.btn-primary');
+    btn.textContent = '✓ Salvo'; btn.style.background = '#10b981';
+    setTimeout(() => { btn.textContent = 'Salvar'; btn.style.background = ''; }, 1800);
+  }
+};
+const mimico = window.mimicoAPI || { minimize:()=>{}, close:()=>{}, quit:()=>{} };
+</script>
+</body>
+</html>
