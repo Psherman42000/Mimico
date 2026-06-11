@@ -24,6 +24,7 @@ import { registerAllIpcHandlers } from './ipc';
 import { VisibilityController } from './visibility-controller';
 import { SettingsWindow } from './settings-window';
 import { PipelineOrchestrator, PipelineCallbacks } from './pipeline';
+import { safeAsync, logAndIgnore } from './error-handler';
 
 // ── Constants ──
 
@@ -158,13 +159,13 @@ function applyConfigChanges(): void {
   const currentProviderName = voiceManager.getProviderName();
   const targetProviderName = config.ttsProvider === 'elevenlabs' ? 'ElevenLabs' : 'Edge';
   if (currentProviderName !== targetProviderName) {
-    initTtsProvider().catch((err) => appLog(`TTS provider swap failed: ${err.message}`));
+    safeAsync(() => initTtsProvider(), (err) => appLog(`TTS provider swap failed: ${err.message}`));
   }
 
   if (pipeline.active) {
     if (config.toggleVoice) {
-      audioOutput.start().catch((err) => appLog(`Failed to start audio output: ${err.message}`));
-      micCapture.start().catch((err) => appLog(`Failed to start mic capture: ${err.message}`));
+      safeAsync(() => audioOutput.start(), (err) => appLog(`Failed to start audio output: ${err.message}`));
+      safeAsync(() => micCapture.start(), (err) => appLog(`Failed to start mic capture: ${err.message}`));
     } else {
       audioOutput.stop();
       micCapture.stop();
@@ -270,7 +271,7 @@ function setupModuleListeners(): void {
   voiceManager.on('error', (error: Error) => appLog(`TTS error: ${error.message}`));
   voiceManager.on('audio', (buffer: Buffer) => {
     if (config.toggleVoice && audioOutput.running) {
-      audioOutput.play(buffer).catch((err) => appLog(`Audio output play error: ${err.message}`));
+      safeAsync(() => audioOutput.play(buffer), (err) => appLog(`Audio output play error: ${err.message}`));
     }
   });
 
