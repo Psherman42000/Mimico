@@ -10,9 +10,13 @@ files:
   - dist/**/*
   - workers/**/*
   - package.json
+  - node_modules/@elevenlabs/**/*
 
 win:
   target:
+    - target: nsis
+      arch:
+        - x64
     - target: portable
       arch:
         - x64
@@ -30,6 +34,9 @@ nsis:
   uninstallerIcon: assets/icon.ico
   installerHeaderIcon: assets/icon.ico
   license: LICENSE
+
+portable:
+  artifactName: "${productName}-${version}-portable.${ext}"
 
 extraResources:
   - from: workers
