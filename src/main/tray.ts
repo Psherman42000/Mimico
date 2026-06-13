@@ -130,6 +130,7 @@ export class TrayManager {
     const icon = createTrayIcon('#888888');
     this.tray = new Tray(icon);
     this.tray.setToolTip('Mimico - Legendas em tempo real');
+    this.tray.on('click', () => this.handlers.onSettings());
     this.updateMenu();
   }
 
