@@ -147,8 +147,7 @@ export class Translator extends EventEmitter {
   /**
    * Traduz um texto do idioma de origem para o idioma de destino.
    *
-   * Se a API key não estiver configurada, retorna o texto original
-   * com o prefixo '[DeepL: configure API key in settings]'.
+   * Retorna null se a API key não estiver configurada ou se a tradução falhar.
    *
    * Utiliza cache LRU: traduções repetidas para o mesmo texto
    * são servidas do cache sem chamar a API.
@@ -156,21 +155,21 @@ export class Translator extends EventEmitter {
    * @param text - Texto a ser traduzido
    * @param sourceLang - Código do idioma de origem (default: 'EN')
    * @param targetLang - Código do idioma de destino (default: 'PT')
-   * @returns Promise com o texto traduzido
+   * @returns Promise com o texto traduzido, ou null se falhar
    */
   async translate(
     text: string,
     sourceLang: string = 'EN',
     targetLang: string = 'PT',
-  ): Promise<string> {
+  ): Promise<string | null> {
     // Se não há texto, retorna vazio
     if (!text || text.trim().length === 0) {
-      return '';
+      return null;
     }
 
-    // Se a API não está configurada, retorna com aviso
+    // Se a API não está configurada, retorna null
     if (!this.configured) {
-      return `[DeepL: configure API key in settings] ${text}`;
+      return null;
     }
 
     // Gera chave de cache
@@ -192,9 +191,7 @@ export class Translator extends EventEmitter {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.emit('error', new Error(`DeepL translation failed: ${errorMessage}`));
-
-      // Fallback: retorna texto original com aviso
-      return `[Translation failed] ${text}`;
+      return null;
     }
   }
 

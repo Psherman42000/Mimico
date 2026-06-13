@@ -4,7 +4,7 @@ import { ipcMain } from 'electron';
 
 export interface TranslationIpcContext {
   translator: {
-    translate: (text: string, from: string, to: string) => Promise<string>;
+    translate: (text: string, from: string, to: string) => Promise<string | null>;
     setApiKey: (key: string) => void;
   };
   appLog: (msg: string) => void;

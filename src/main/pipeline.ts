@@ -111,7 +111,7 @@ export class PipelineOrchestrator {
       this.overlay.updateText(enText, ptText);
       this.cb.broadcastTranslation(enText, ptText);
 
-      if (cfg.toggleVoice && !ptText.startsWith('[')) {
+      if (cfg.toggleVoice) {
         const ttsLang = LANG_MAP[cfg.language] ?? 'pt-BR';
         await this.voiceManager.speakText(ptText, ttsLang).catch((err: Error) => {
           this.cb.log(`TTS error: ${err.message}`);
@@ -133,7 +133,7 @@ export class PipelineOrchestrator {
       if (!ptText?.trim()) return;
 
       const enText = await this.translator.translate(ptText, 'PT', 'EN');
-      if (enText.startsWith('[')) return;
+      if (!enText) return;
 
       this.cb.log(`[Mic] PT→EN: "${ptText.slice(0, 40)}…" → "${enText.slice(0, 40)}…"`);
       await this.voiceManager.speakText(enText, 'en-US')
