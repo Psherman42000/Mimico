@@ -508,16 +508,23 @@
     connectingOverlay.className = 'notch-connecting' + (visible ? ' visible' : '');
   });
 
-  // ── Click on notch pill toggles expand ──
-  // When collapsed, clicking anywhere expands
-  // Click on notch-collapsed area
+  // ── Hover to expand, click to toggle ──
+  // Hover (mouse enter) on the notch expands it
+  notch.addEventListener('mouseenter', () => {
+    if (!isExpanded) { expand(); }
+  });
+
+  // Click on collapsed area also expands
   document.querySelector('.notch-collapsed')?.addEventListener('click', () => {
     if (!isExpanded) { expand(); }
   });
 
-  // Prevent collapse when clicking inside expanded area (on content)
-  document.querySelector('.notch-expanded')?.addEventListener('click', (e) => {
-    // Don't propagate
+  // Click on the expanded notch background collapses it back
+  notch.addEventListener('click', (e) => {
+    // Only toggle if clicking the notch background itself, not interactive elements
+    if (isExpanded && e.target === notch) {
+      collapse();
+    }
   });
 
   // ── Initial state ──

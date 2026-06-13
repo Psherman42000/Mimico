@@ -113,7 +113,12 @@ export class VisibilityController {
         break;
 
       case 'tapping':
-        // Segundo pressionamento rápido dentro do tap → ignora (debounce)
+        // Segundo evento = keyup (soltou a tecla) → confirma TAP
+        // Timer ainda rodando = usuário não segurou o tempo do hold
+        if (this.tapTimer) clearTimeout(this.tapTimer);
+        this.tapTimer = null;
+        this.state = 'idle';
+        this.toggleVisibility();
         break;
 
       case 'holding':
