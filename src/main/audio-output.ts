@@ -30,10 +30,6 @@ export class AudioOutput extends WorkerProcess {
   protected get workerName(): string { return 'audio-output'; }
   protected get scriptName(): string { return 'audio_output.py'; }
 
-  constructor(private deviceName: string = 'CABLE Input') {
-    super();
-  }
-
   async start(): Promise<void> {
     await super.start();
     this.sendJson({ command: 'list_devices' });
@@ -109,16 +105,6 @@ export class AudioOutput extends WorkerProcess {
   setMixMode(mode: 'replace' | 'overlay'): void {
     this.log(`Mix mode: ${mode}`);
     this.sendJson({ command: 'set_mix_mode', mode });
-  }
-
-  async restart(): Promise<void> {
-    this.stop();
-    await new Promise((r) => setTimeout(r, 300));
-    await this.start();
-  }
-
-  shutdown(): void {
-    this.dispose();
   }
 }
 

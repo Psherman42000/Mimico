@@ -133,11 +133,6 @@ export class WhisperManager extends WorkerProcess {
   }
 
   get modelSize(): WhisperModelSize { return this.currentModel; }
-
-  dispose(): void {
-    this.stop();
-    this.removeAllListeners();
-  }
 }
 
 export default WhisperManager;
