@@ -102,7 +102,8 @@ export class PipelineOrchestrator {
     const cfg = this.config();
 
     try {
-      const enText = await this.whisper.transcribe(chunk);
+      const sourceLang = cfg.sourceLang || 'EN';
+      const enText = await this.whisper.transcribe(chunk, sourceLang !== 'EN' ? sourceLang.toLowerCase() : undefined);
       if (!enText?.trim()) return;
 
       const ptText = await this.translator.translate(enText, 'EN', cfg.language);

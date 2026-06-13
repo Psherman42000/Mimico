@@ -25,6 +25,8 @@ export interface Config {
   // ── Preferências ──
   /** Idioma alvo para tradução (código ISO, ex: 'PT', 'EN', 'ES', 'FR', 'DE') */
   language: string;
+  /** Idioma de origem (sistema) — o que é falado no áudio do sistema */
+  sourceLang: string;
   /** Atalho global para ligar/desligar a captura */
   toggleHotkey: string;
   /** Atalho global para mostrar/esconder o overlay */
@@ -55,6 +57,7 @@ const DEFAULTS: Config = {
 
   // Preferências
   language: 'PT',
+  sourceLang: 'EN',
   toggleHotkey: 'Alt+Shift+M',
   overlayHotkey: 'Alt+Shift+O',
   toggleVoice: false,
