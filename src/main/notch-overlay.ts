@@ -3,7 +3,6 @@
 import { BrowserWindow, ipcMain, screen } from 'electron';
 import { resolve } from 'path';
 import { applyNotchShape } from './win32-notch';
-import { DisplayTopologyCoordinator, normalizeWindowZoom } from './display-layout';
 
 /** Dimensões do notch */
 const COLLAPSED_WIDTH = 300;
@@ -32,7 +31,6 @@ export class NotchOverlay {
   private mixMode: 'replace' | 'overlay' = 'replace';
   private collapseTimer: ReturnType<typeof setTimeout> | null = null;
   private lastText: { en: string; pt: string } = { en: '', pt: '' };
-  private displayCoordinator: DisplayTopologyCoordinator | null = null;
 
   /**
    * Cria e exibe a janela do notch overlay.
@@ -85,13 +83,12 @@ export class NotchOverlay {
     // Configura IPC
     this.setupIPC();
 
-    // Inicia coordenador de display
-    this.displayCoordinator = new DisplayTopologyCoordinator();
-    this.displayCoordinator.registerWindow('notch', this.window);
-    this.displayCoordinator.onDisplayChanged(() => {
-      this.reposition();
+    // Monitora mudanças de display para reposicionar
+    const onDisplayChange = () => this.reposition();
+    screen.on('display-metrics-changed', onDisplayChange);
+    this.window.on('close', () => {
+      screen.removeListener('display-metrics-changed', onDisplayChange);
     });
-    this.displayCoordinator.start();
 
     // Envia estado inicial
     this.sendInitState();
@@ -254,7 +251,9 @@ export class NotchOverlay {
     const bounds = this.getAlignedBounds(this.isExpanded);
     this.window.setBounds(bounds, true);
     applyNotchShape(this.window!, this.isExpanded);
-    normalizeWindowZoom(this.window);
+    // Ajusta zoom para DPI scaling
+    const display = screen.getDisplayMatching(this.window.getBounds());
+    this.window.webContents.setZoomFactor(display.scaleFactor || 1);
   }
 
   private getAlignedBounds(expanded: boolean): Electron.Rectangle {
@@ -285,11 +284,6 @@ export class NotchOverlay {
     if (this.collapseTimer) {
       clearTimeout(this.collapseTimer);
       this.collapseTimer = null;
-    }
-
-    if (this.displayCoordinator) {
-      this.displayCoordinator.dispose();
-      this.displayCoordinator = null;
     }
 
     if (this.window && !this.window.isDestroyed()) {
