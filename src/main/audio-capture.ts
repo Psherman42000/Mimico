@@ -1,17 +1,12 @@
 /**
- * audio-capture.ts — Captura de áudio WASAPI loopback via worker Python
+ * audio-capture.ts — Captura de áudio via worker Python (loopback ou microfone)
  *
- * Gerencia o processo filho Python (workers/audio_capture.py) que captura
- * o áudio do sistema usando WASAPI loopback.
+ * Classe única para ambos os pipelines:
+ * - Loopback (sistema): workers/audio_capture.py
+ * - Microfone: workers/audio_mic_capture.py
  *
- * Comunicação via stdin/stdout JSON:
- * - Envio: { command: 'start' } | { command: 'stop' } | { command: 'exit' }
- * - Recebimento: { type: 'ready' } | { type: 'audio', data: <base64>, sample_rate, channels, dtype, rms }
- *                | { type: 'status', status } | { type: 'error', message }
- *
- * Eventos emitidos:
- * - 'data': Buffer PCM chunk (float32 mono 16000Hz)
- * - 'error', 'exit'
+ * Comunicação: JSON via stdin/stdout.
+ * Eventos emitidos: 'data' (Buffer PCM), 'error', 'exit', 'started', 'stopped'
  */
 import { WorkerProcess } from './worker-process';
 
@@ -22,9 +17,25 @@ interface AudioMessage {
   message?: string;
 }
 
+interface AudioCaptureOptions {
+  /** Rótulo para logs (ex: 'audio-capture', 'mic-capture') */
+  workerName: string;
+  /** Nome do script Python (ex: 'audio_capture.py') */
+  scriptName: string;
+  /** Prefixo nas mensagens de erro */
+  errorLabel: string;
+}
+
 export class AudioCapture extends WorkerProcess {
-  protected get workerName(): string { return 'audio-capture'; }
-  protected get scriptName(): string { return 'audio_capture.py'; }
+  private errorLabel: string;
+
+  constructor(private options: AudioCaptureOptions) {
+    super();
+    this.errorLabel = options.errorLabel;
+  }
+
+  protected get workerName(): string { return this.options.workerName; }
+  protected get scriptName(): string { return this.options.scriptName; }
 
   async start(config: Record<string, unknown> = {}): Promise<void> {
     await super.start();
@@ -39,7 +50,6 @@ export class AudioCapture extends WorkerProcess {
     switch (msg.type) {
       case 'ready':
         this.ready = true;
-        this.log(`Worker ready`);
         this.emit('ready');
         break;
 
@@ -58,14 +68,9 @@ export class AudioCapture extends WorkerProcess {
 
       case 'error':
         this.log(`Worker error: ${msg.message ?? 'unknown'}`);
-        this.emit('error', new Error(`Audio capture worker: ${msg.message ?? 'unknown error'}`));
+        this.emit('error', new Error(`${this.errorLabel}: ${msg.message ?? 'unknown error'}`));
         break;
     }
-  }
-
-  async restart(config?: Record<string, unknown>): Promise<void> {
-    this.stop();
-    await this.start(config);
   }
 }
 

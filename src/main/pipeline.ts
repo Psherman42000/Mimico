@@ -8,7 +8,6 @@
  *   Mic PT → Whisper PT → DeepL PT→EN → TTS EN → VB-Cable
  */
 import { AudioCapture } from './audio-capture';
-import { MicCapture } from './mic-capture';
 import { WhisperManager } from './whisper-manager';
 import { Translator } from './translator';
 import { VoiceManager } from './voice-manager';
@@ -34,7 +33,7 @@ export class PipelineOrchestrator {
 
   constructor(
     private audioCapture: AudioCapture,
-    private micCapture: MicCapture,
+    private micCapture: AudioCapture,
     private whisper: WhisperManager,
     private translator: Translator,
     private voiceManager: VoiceManager,

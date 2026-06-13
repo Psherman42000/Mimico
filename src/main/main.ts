@@ -11,7 +11,6 @@ import { existsSync } from 'fs';
 
 import { loadConfig, saveConfig, Config } from './config';
 import { AudioCapture } from './audio-capture';
-import { MicCapture } from './mic-capture';
 import { WhisperManager } from './whisper-manager';
 import { Translator } from './translator';
 import { VoiceManager } from './voice-manager';
@@ -54,7 +53,7 @@ function appLog(msg: string): void {
 
 let config: Config;
 let audioCapture: AudioCapture;
-let micCapture: MicCapture;
+let micCapture: AudioCapture;
 let whisperManager: WhisperManager;
 let translator: Translator;
 let voiceManager: VoiceManager;
@@ -207,7 +206,7 @@ function registerGlobalShortcuts(): void {
 }
 
 function unregisterGlobalShortcuts(): void {
-  globalShortcut.unregisterAll();
+  try { globalShortcut.unregisterAll(); } catch { /* app may not be ready */ }
 }
 
 // ── Broadcast ──
@@ -231,8 +230,16 @@ function openSettings(): void {
 
 function initializeModules(): void {
   config = loadConfig();
-  audioCapture = new AudioCapture();
-  micCapture = new MicCapture();
+  audioCapture = new AudioCapture({
+    workerName: 'audio-capture',
+    scriptName: 'audio_capture.py',
+    errorLabel: 'Audio capture worker',
+  });
+  micCapture = new AudioCapture({
+    workerName: 'mic-capture',
+    scriptName: 'audio_mic_capture.py',
+    errorLabel: 'Mic capture worker',
+  });
   whisperManager = new WhisperManager();
   translator = new Translator(config.deepKey);
   voiceManager = new VoiceManager();
