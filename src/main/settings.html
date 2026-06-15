@@ -494,6 +494,13 @@
           </select>
           <div class="hint" id="ttsProviderHint">Edge TTS: gratuito, sem API key, vozes Microsoft.</div>
         </div>
+        <div id="edgeVoiceField">
+          <div class="field">
+            <label>Voz Edge TTS</label>
+            <select id="edgeVoice"></select>
+            <div class="hint">Selecione a voz para síntese local. Gratuito, sem API key.</div>
+          </div>
+        </div>
         <div id="elevenlabsFields" style="display:none">
           <div class="field">
             <label>Chave da API ElevenLabs</label>
@@ -611,6 +618,7 @@
     setVal('micDevice', config.micDevice || 'default');
     setVal('loopbackDevice', config.loopbackDevice || 'default');
     setVal('mixMode', config.voiceMixMode || 'replace');
+    setVal('edgeVoice', config.edgeVoice || 'en-US-JennyNeural');
 
     toggleEl('toggleVoice', !!config.toggleVoice);
     toggleEl('togglePipeline', config.appMode !== 'off');
@@ -679,7 +687,28 @@
     document.getElementById('ttsProviderHint').textContent =
       show ? 'ElevenLabs: API key necessária (Starter $5/mo+).'
            : 'Edge TTS: gratuito, sem API key, vozes Microsoft.';
+    document.getElementById('edgeVoiceField').style.display = show ? 'none' : 'block';
     savePartial({ ttsProvider: this.value });
+  });
+
+  // ── Edge voice selector ──
+  async function loadEdgeVoices() {
+    const result = await ipcRenderer.invoke('edge:list-voices');
+    if (!result.success) return;
+    const select = document.getElementById('edgeVoice');
+    if (!select) return;
+    select.innerHTML = '';
+    for (const voice of result.voices) {
+      const opt = document.createElement('option');
+      opt.value = voice;
+      opt.textContent = voice;
+      select.appendChild(opt);
+    }
+    if (config.edgeVoice) select.value = config.edgeVoice;
+  }
+
+  document.getElementById('edgeVoice')?.addEventListener('change', function() {
+    savePartial({ edgeVoice: this.value });
   });
 
   // Toggle: pipeline
@@ -750,6 +779,7 @@
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   loadConfig();
+  loadEdgeVoices();
   updateStatusBar();
   updateAboutStatus();
 

@@ -35,7 +35,7 @@ Guia passo a passo para configurar e usar o Mimico no seu PC.
 ### 1.3 Instalar dependências Python
 
 ```bash
-pip install faster-whisper openvoice sounddevice numpy
+pip install faster-whisper sounddevice numpy edge-tts
 ```
 
 ### 1.4 Instalar o Mimico
@@ -70,19 +70,36 @@ O ícone do Mimico aparece na bandeja do sistema (ao lado do relógio). Clique c
 
 ---
 
-## 3. Gravação da Voz
+## 3. Configuração do TTS
 
-Para usar o toggle de voz clonada, você precisa gravar sua voz primeiro.
+O Mimico suporta dois provedores de síntese de voz:
 
-### Como gravar:
+### Edge TTS (Padrão — Gratuito)
+- **Custo:** $0, sem API key, sem cadastro
+- **Vozes:** Microsoft Neural TTS — pt-BR (Francisca, Antonio), EN-US (Jenny, Aria, Guy), EN-GB, ES, FR, DE
+- **Latência:** ~1s
+- **Requer:** `pip install edge-tts`
 
+### ElevenLabs (Premium)
+- **Custo:** Starter $5/mo+
+- **Vozes:** Centenas, suporte a voice cloning
+- **Latência:** ~500ms (Flash v2.5)
+- **Requer:** API key (configurada no painel)
+
+### Como trocar a voz do Edge TTS
 1. Abra Configurações (clique no ícone da bandeja > Configurações)
-2. Clique em "Gravar minha voz"
-3. Leia o texto sugerido em português por ~30 segundos
-4. Mantenha o ambiente silencioso
-5. Clique em "Salvar"
+2. Vá na seção "♫ Voz"
+3. Selecione a voz desejada no dropdown "Voz Edge TTS"
+4. A voz é salva automaticamente
 
-A gravação é processada localmente e o embedding da sua voz é salvo no seu PC. Nada é enviado para a nuvem (a menos que você configure TTS via API).
+As vozes disponíveis incluem:
+- `pt-BR-FranciscaNeural` — Feminino, PT-BR
+- `pt-BR-AntonioNeural` — Masculino, PT-BR
+- `en-US-JennyNeural` — Feminino, EN-US (padrão)
+- `en-US-AriaNeural` — Feminino, EN-US
+- `en-US-GuyNeural` — Masculino, EN-US
+- `en-GB-SoniaNeural` — Feminino, EN-GB
+- `en-GB-RyanNeural` — Masculino, EN-GB
 
 ---
 
@@ -91,16 +108,20 @@ A gravação é processada localmente e o embedding da sua voz é salvo no seu P
 ### Tela de Configurações
 
 | Opção | Descrição | Padrão |
-|---|---|---|
+|---|---|---|---|
 | **DeepL API Key** | Chave da API DeepL (grátis) | — |
-| **Modo TTS** | Local (OpenVoice) ou API | `local` |
-| **Provider TTS** | cartesia / fish / openai | `cartesia` |
-| **API Key TTS** | Chave do provider escolhido | — |
+| **Provedor TTS** | Edge (gratuito) ou ElevenLabs (pago) | `edge` |
+| **Voz Edge TTS** | Voz específica do Edge (ex: pt-BR-AntonioNeural) | `en-US-JennyNeural` |
+| **ElevenLabs Key** | Chave da API ElevenLabs | — |
+| **ElevenLabs Voice ID** | ID da voz ElevenLabs | — |
+| **ElevenLabs Model** | Modelo ElevenLabs (Flash, Turbo, Multilingual) | `eleven_flash_v2_5` |
 | **Idioma origem** | Idioma do áudio capturado | `EN` |
-| **Idioma destino** | Idioma da tradução | `PT-BR` |
-| **Iniciar com Windows** | Auto-start | `off` |
-| **Hotkey** | Atalho para mostrar/ocultar overlay | `Ctrl+Shift+M` |
-| **Opacidade** | Transparência da overlay | `80%` |
+| **Idioma destino** | Idioma da tradução | `PT` |
+| **VB-Cable** | Nome do dispositivo VB-Cable | `CABLE Input` |
+| **Whisper** | Tamanho do modelo (tiny → large) | `tiny` |
+| **Hotkey toggle** | Atalho para ligar/desligar pipeline | `Alt+Shift+M` |
+| **Hotkey overlay** | Atalho para mostrar/esconder overlay | `Alt+Shift+O` |
+| **Opacidade** | Transparência do overlay | `0.85` |
 
 ---
 
@@ -111,10 +132,10 @@ A gravação é processada localmente e o embedding da sua voz é salvo no seu P
 #### ▶️ Transcrição + Tradução (sempre ativo)
 Assim que o app inicia, ele começa a capturar áudio do sistema. Quando detecta fala em inglês, transcreve e traduz automaticamente. O resultado aparece na overlay.
 
-#### 🎤 Toggle de Voz Clonada
+#### 🎤 Toggle de Voz Traduzida
 Clique no botão 🎤 na overlay para ativar. Quando ativo:
 - O que você falar em português (no seu microfone) é **traduzido para inglês**
-- O áudio é gerado com **sua voz clonada**
+- O áudio é gerado com Edge TTS (voz selecionada nas configurações)
 - O áudio é injetado no VB-Cable
 - Apps como Meet/Discord capturam o VB-Cable como seu microfone
 
@@ -128,27 +149,16 @@ A janela do Mimico **não aparece em gravações de tela** (OBS, Meet, Discord, 
 
 ---
 
-## 6. Fallback para API Paga
+## 6. Fallback para API Paga (ElevenLabs)
 
-Se o modo local (OpenVoice) estiver lento demais (>3s), você pode configurar uma API externa.
-
-### Opções Disponíveis
-
-| Provider | Preço | Clonagem | Latência |
-|---|---|---|---|
-| **Cartesia** | **$4/mês** (100k créditos) | ✅ Instant | ~500ms |
-| **Fish.audio** | **$11/mês** (250k créditos) | ✅ Enhanced | ~800ms |
-| **OpenAI TTS** | $0.015/1k chars | ❌ | ~500ms |
+Se você quiser vozes mais naturais ou clonagem de voz, configure o ElevenLabs.
 
 ### Como configurar
 
 1. Abra Configurações
-2. Mude "Modo TTS" de "Local" para "API"
-3. Selecione o provider (ex: "Cartesia")
-4. Insira sua API Key
-5. Clique "Salvar"
-
-O app automaticamente testa a latência e sugere trocar se o modo local estiver acima de 3s.
+2. Na seção "♫ Voz", mude o Provedor TTS para "ElevenLabs"
+3. Insira sua API Key e ID da voz
+4. A configuração é salva automaticamente
 
 ---
 
@@ -159,8 +169,9 @@ O app automaticamente testa a latência e sugere trocar se o modo local estiver 
 | Overlay não aparece | App minimizado na bandeja | Clique no ícone da bandeja |
 | Overlay aparece em gravação | Driver de vídeo desatualizado | Atualizar driver NVIDIA |
 | Sem transcrição | Microfone de entrada errado | Verificar dispositivo de áudio no Windows |
-| Whisper muito lento | CPU sem GPU | Usar modelo `tiny` ou ativar fallback API |
-| Voz clonada robótica | Amostra de voz curta/difícil | Regravar com 30s+ em ambiente silencioso |
+| Whisper muito lento | CPU sem GPU | Usar modelo `tiny` |
+| Edge TTS não funciona | edge-tts não instalado | `pip install edge-tts` |
+| ElevenLabs erro | Chave inválida ou cota excedida | Verificar plano em elevenlabs.io |
 | VB-Cable não aparece | Driver não instalado | Instalar VB-Cable e reiniciar |
 | DeepL erro | Chave inválida ou cota excedida | Verificar chave em deepl.com |
 | App não inicia | Porta ocupada | Verificar se já está rodando |
@@ -180,9 +191,9 @@ Inclua esses logs ao reportar bugs.
 
 | Atalho | Ação |
 |---|---|
-| `Ctrl+Shift+M` | Mostrar/Ocultar overlay |
-| `Ctrl+Shift+T` | Testar latência do pipeline |
-| `Ctrl+Shift+Q` | Sair do app |
+| `Alt+Shift+M` | Ligar/Desligar pipeline |
+| `Alt+Shift+O` | Mostrar/Ocultar overlay |
+| `Ctrl+B` | Stealth mode (tap toggle, hold fade) |
 
 ---
 

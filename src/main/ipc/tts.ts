@@ -1,7 +1,11 @@
 /** ipc/tts.ts - Handlers IPC de síntese de voz (TTS) */
 
 import { ipcMain } from 'electron';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import type { TtsProvider } from '../tts-provider';
+
+const execFileAsync = promisify(execFile);
 
 export interface TtsIpcContext {
   voiceManager: {
@@ -45,5 +49,20 @@ export function registerTtsHandlers(ctx: TtsIpcContext): void {
       return provider.getInfo();
     }
     return { name: 'Nenhum', needsApiKey: false, hasApiKey: false };
+  });
+
+  ipcMain.handle('edge:list-voices', async () => {
+    try {
+      const { stdout } = await execFileAsync('edge-tts', ['--list-voices'], {
+        timeout: 10000, windowsHide: true,
+      });
+      const voices = stdout.split('\n')
+        .filter(line => line.startsWith('Name:'))
+        .map(line => line.replace('Name:', '').trim().split(/\s+/)[0])
+        .filter(Boolean);
+      return { success: true, voices };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 }

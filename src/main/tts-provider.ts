@@ -8,6 +8,8 @@ export interface TtsOptions {
   text: string;
   /** Código do idioma (ex: 'pt-BR', 'en-US', 'en') */
   lang: string;
+  /** Voz específica (opcional — sobrepõe o mapeamento padrão por lang) */
+  voice?: string;
 }
 
 /** Metadados sobre um provedor TTS */

@@ -79,7 +79,7 @@ export class EdgeTtsProvider extends TtsProvider {
     this.emit('started', text);
 
     try {
-      const voice = VOICE_MAP[lang] ?? 'pt-BR-FranciscaNeural';
+      const voiceName = options.voice ?? VOICE_MAP[lang] ?? 'pt-BR-FranciscaNeural';
       const tmpFile = join(tmpdir(), `mimico_edge_${randomBytes(4).toString('hex')}.wav`);
 
       try {
@@ -87,7 +87,7 @@ export class EdgeTtsProvider extends TtsProvider {
         await new Promise<void>((resolve, reject) => {
           const child = execFile(
             'edge-tts',
-            ['--voice', voice, '--text', text, '--write-media', tmpFile],
+            ['--voice', voiceName, '--text', text, '--write-media', tmpFile],
             { timeout: 30000, windowsHide: true },
             (error) => {
               if (error) reject(new Error(`edge-tts: ${error.message}`));

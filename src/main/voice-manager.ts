@@ -66,11 +66,11 @@ export class VoiceManager extends EventEmitter {
    * @param lang - Código do idioma (ex: 'pt-BR', 'en-US')
    * @throws Se não houver provider configurado
    */
-  async speakText(text: string, lang: string = 'pt-BR'): Promise<void> {
+  async speakText(text: string, lang: string = 'pt-BR', voice?: string): Promise<void> {
     if (!this.provider) {
       throw new Error('No TTS provider configured');
     }
-    await this.provider.speak({ text, lang });
+    await this.provider.speak({ text, lang, voice });
   }
 
   stop(): void {

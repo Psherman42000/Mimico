@@ -38,7 +38,7 @@ Mimico é um aplicativo desktop Windows que opera em segundo plano com **dois pi
 │  ├── mic-capture.ts    → Gerencia worker microfone       🔧  │
 │  ├── whisper-manager.ts→ Gerencia worker transcrição         │
 │  ├── translator.ts     → DeepL API + cache LRU               │
-│  ├── voice-manager.ts  → Edge TTS                            │
+|  ├── voice-manager.ts  → Edge TTS / ElevenLabs              │
 │  └── audio-output.ts   → VB-Cable playback                   │
 ├──────────────────────────────────────────────────────────────┤
 │                    WORKERS (Python child processes)            │
@@ -99,12 +99,18 @@ Microfone (sua voz PT) → [audio_mic_capture.py] → PCM 16kHz mono
 {
   "deepKey": "",
   "language": "PT",
+  "sourceLang": "EN",
   "toggleHotkey": "Alt+Shift+M",
   "overlayHotkey": "Alt+Shift+O",
   "toggleVoice": false,
   "overlayOpacity": 0.85,
   "vbcableDevice": "CABLE Input",
-  "whisperModelSize": "tiny"
+  "whisperModelSize": "tiny",
+  "ttsProvider": "edge",
+  "edgeVoice": "en-US-JennyNeural",
+  "elevenLabsKey": "",
+  "elevenLabsVoiceId": "",
+  "elevenLabsModel": "eleven_flash_v2_5"
 }
 ```
 
@@ -122,10 +128,10 @@ Microfone (sua voz PT) → [audio_mic_capture.py] → PCM 16kHz mono
 - **Decisão:** DeepL Free — 500k chars/mês, ~500ms latência, melhor qualidade que Google Translate
 - **Consequências:** Precisa de chave de API (cadastro gratuito)
 
-### ADR-3: Por que Edge TTS e não OpenVoice?
+### ADR-3: Por que Edge TTS como padrão e não ElevenLabs?
 - **Contexto:** Precisamos de TTS rápido, gratuito e em português + inglês
-- **Decisão:** Edge TTS — gratuito, sem instalação adicional, vozes EN/PT excelentes
-- **Consequências:** Não clona sua voz (voz genérica do Edge), mas $0 e latência ~1s
+- **Decisão:** Edge TTS como padrão — gratuito, sem API key, vozes EN/PT excelentes. ElevenLabs como alternativa premium com suporte a voice cloning
+- **Consequências:** Edge TTS não clona sua voz (voz genérica da Microsoft), mas $0 e latência ~1s. ElevenLabs oferece clonagem mas requer assinatura ($5/mo+)
 
 ### ADR-4: Por que WASAPI via Python e não Node bindings?
 - **Contexto:** Captura WASAPI loopback no Windows

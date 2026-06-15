@@ -41,6 +41,8 @@ export interface Config {
   whisperModelSize: string;
   /** Provedor TTS: 'edge' (local) ou 'elevenlabs' (API) */
   ttsProvider: 'edge' | 'elevenlabs';
+  /** Voz do Edge TTS (nome completo, ex: 'pt-BR-AntonioNeural') */
+  edgeVoice: string;
 }
 
 /** Valores padrão para a configuração */
@@ -65,6 +67,7 @@ const DEFAULTS: Config = {
   vbcableDevice: 'CABLE Input',
   whisperModelSize: 'tiny',
   ttsProvider: 'edge',
+  edgeVoice: 'en-US-JennyNeural',
 };
 
 /** Caminho do arquivo de configuração */
