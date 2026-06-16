@@ -56,9 +56,12 @@ export function registerTtsHandlers(ctx: TtsIpcContext): void {
       const { stdout } = await execFileAsync('edge-tts', ['--list-voices'], {
         timeout: 10000, windowsHide: true,
       });
+      // Output is a table: header row, separator dashes, then data rows
+      // Voice name is the first whitespace-delimited token on each data line
       const voices = stdout.split('\n')
-        .filter(line => line.startsWith('Name:'))
-        .map(line => line.replace('Name:', '').trim().split(/\s+/)[0])
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('Name') && !line.startsWith('-'))
+        .map(line => line.split(/\s+/)[0])
         .filter(Boolean);
       return { success: true, voices };
     } catch (error) {

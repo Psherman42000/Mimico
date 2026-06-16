@@ -693,18 +693,22 @@
 
   // ── Edge voice selector ──
   async function loadEdgeVoices() {
-    const result = await ipcRenderer.invoke('edge:list-voices');
-    if (!result.success) return;
-    const select = document.getElementById('edgeVoice');
-    if (!select) return;
-    select.innerHTML = '';
-    for (const voice of result.voices) {
-      const opt = document.createElement('option');
-      opt.value = voice;
-      opt.textContent = voice;
-      select.appendChild(opt);
+    try {
+      const result = await ipcRenderer.invoke('edge:list-voices');
+      if (!result.success) return;
+      const select = document.getElementById('edgeVoice');
+      if (!select) return;
+      select.innerHTML = '';
+      for (const voice of result.voices) {
+        const opt = document.createElement('option');
+        opt.value = voice;
+        opt.textContent = voice;
+        select.appendChild(opt);
+      }
+      if (config.edgeVoice) select.value = config.edgeVoice;
+    } catch (err) {
+      console.error('Failed to load Edge voices:', err);
     }
-    if (config.edgeVoice) select.value = config.edgeVoice;
   }
 
   document.getElementById('edgeVoice')?.addEventListener('change', function() {
