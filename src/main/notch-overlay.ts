@@ -103,10 +103,27 @@ export class NotchOverlay {
         this.onToggleVoice(active);
       }
     });
+
+    ipcMain.on('notch-open-settings', () => {
+      if (this.onOpenSettings) {
+        this.onOpenSettings();
+      }
+    });
+
+    ipcMain.on('notch-close', () => {
+      this.hide();
+      if (this.onClose) {
+        this.onClose();
+      }
+    });
   }
 
   /** Callback externo para toggle de voz */
   onToggleVoice: ((active: boolean) => void) | null = null;
+  /** Callback externo para abrir configurações */
+  onOpenSettings: (() => void) | null = null;
+  /** Callback externo para fechar overlay */
+  onClose: (() => void) | null = null;
 
   private sendInitState(): void {
     this.sendToRenderer('notch-init', {

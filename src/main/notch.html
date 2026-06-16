@@ -159,6 +159,32 @@
     color: var(--text-muted);
   }
 
+  /* Window control buttons */
+  .win-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .win-btn:hover {
+    background: rgba(255,255,255,0.10);
+    color: var(--text-primary);
+  }
+  .win-btn.close:hover {
+    background: rgba(255,71,87,0.25);
+    color: #ff4757;
+  }
+
   /* Translation feed */
   .notch-feed {
     flex: 1;
@@ -323,6 +349,8 @@
         <span class="mode-label" id="modeLabel">LEGENDAS</span>
         <span class="spacer"></span>
         <span class="tts-badge" id="ttsBadge">♫ Edge</span>
+        <button class="win-btn" id="btnSettings" title="Configurações">⚙</button>
+        <button class="win-btn close" id="btnClose" title="Fechar (bandeja)">✕</button>
       </div>
 
       <!-- Feed -->
@@ -401,6 +429,15 @@
       const panel = document.getElementById('panel-' + btn.dataset.tab);
       if (panel) panel.classList.add('active');
     });
+  });
+
+  // ── Window controls ──
+  document.getElementById('btnSettings')?.addEventListener('click', () => {
+    ipcRenderer.send('notch-open-settings');
+  });
+
+  document.getElementById('btnClose')?.addEventListener('click', () => {
+    ipcRenderer.send('notch-close');
   });
 
   // ── Voice toggle click ──
