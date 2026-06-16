@@ -304,7 +304,7 @@ function setupModuleListeners(): void {
   };
 
   overlay.onClose = () => {
-    trayManager.showNotification(APP_NAME, 'Mimico continua rodando na bandeja.');
+    app.quit();
   };
 }
 
