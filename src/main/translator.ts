@@ -167,9 +167,11 @@ export class Translator extends EventEmitter {
       return null;
     }
 
-    // Se a API não está configurada, retorna null
+    // Se a API não está configurada, retorna o texto original (pass-through)
+    // e emite aviso para que o usuário configure a API key
     if (!this.configured) {
-      return null;
+      this.emit('warning', 'DeepL API key not configured. Returning original text. Set DEEPL_API_KEY in config.');
+      return text;  // pass-through em vez de null
     }
 
     // Gera chave de cache

@@ -62,12 +62,12 @@ const DEFAULTS: Config = {
   sourceLang: 'EN',
   toggleHotkey: 'Alt+Shift+M',
   overlayHotkey: 'Alt+Shift+O',
-  toggleVoice: false,
+  toggleVoice: true,
   overlayOpacity: 0.85,
   vbcableDevice: 'CABLE Input',
   whisperModelSize: 'tiny',
   ttsProvider: 'edge',
-  edgeVoice: 'en-US-JennyNeural',
+  edgeVoice: 'pt-BR-AntonioNeural',
 };
 
 /** Caminho do arquivo de configuração */
