@@ -15,7 +15,7 @@ import { resolve } from 'path';
 import { createInterface, Interface as ReadlineInterface } from 'readline';
 
 const PROJECT_ROOT = resolve(__dirname, '..', '..');
-const DEFAULT_READY_TIMEOUT = 10_000;
+const DEFAULT_READY_TIMEOUT = 60_000;  // 60s para Whisper carregar modelo
 const DEFAULT_KILL_TIMEOUT = 5_000;
 
 export abstract class WorkerProcess extends EventEmitter {

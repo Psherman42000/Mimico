@@ -18,7 +18,7 @@
 import { WorkerProcess } from './worker-process';
 import { resolve } from 'path';
 
-const MODEL_LOAD_TIMEOUT = 120_000;
+const MODEL_LOAD_TIMEOUT = 180_000;  // 3 minutos para download + load
 const TRANSCRIPTION_TIMEOUT = 30_000;
 
 export type WhisperModelSize = 'tiny' | 'base' | 'small' | 'medium' | 'large';

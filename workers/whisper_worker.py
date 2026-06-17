@@ -188,22 +188,24 @@ def main() -> None:
             send_json({"type": "error", "message": f"Invalid JSON: {exc}"})
             continue
 
-        command = msg.get("command", "")
+        # Suporta tanto 'command' quanto 'action' para compatibilidade
+        command = msg.get("command") or msg.get("action", "")
 
         try:
-            if command == "load_model":
+            if command in ("load_model", "load"):
                 size = msg.get("size", DEFAULT_MODEL_SIZE)
                 handler.load_model(size)
 
-            elif command == "transcribe":
-                b64_data = msg.get("data", "")
+            elif command in ("transcribe", "transcription"):
+                # Suporta tanto 'data' quanto 'audio' para compatibilidade
+                b64_data = msg.get("data") or msg.get("audio", "")
                 if not b64_data:
                     send_json({"type": "error", "message": "No 'data' field with base64 audio"})
                     continue
                 language = msg.get("language", None)
                 handler.transcribe(b64_data, language=language)
 
-            elif command == "exit":
+            elif command in ("exit", "quit"):
                 send_json({"type": "status", "status": "exiting"})
                 break
 
