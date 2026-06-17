@@ -12,6 +12,7 @@ import base64
 import struct
 import io
 import traceback
+import threading
 
 import numpy as np
 import sounddevice as sd
@@ -48,49 +49,41 @@ def compute_rms(audio_block: np.ndarray) -> float:
 
 def find_wasapi_loopback_device() -> int | None:
     """
-    Find a WASAPI output device that supports loopback capture.
+    Find an audio capture device.
+    Prefers 'Stereo Mix' / 'Mixagem estéreo' devices,
+    then falls back to default input device (microphone).
     Returns the device index or None.
     """
     try:
         devices = sd.query_devices()
-        hostapis = sd.query_hostapis()
 
-        # Locate WASAPI host API index
-        wasapi_idx = None
-        for i, ha in enumerate(hostapis):
-            if WASAPI_HOST_NAME.lower() in ha['name'].lower():
-                wasapi_idx = i
-                break
+        # 1. Prefer Stereo Mix / Mixagem estéreo (loopback built-in)
+        for idx, dev in enumerate(devices):
+            name_lower = str(dev.get("name", "")).lower()
+            if "mixagem" in name_lower or "stereo mix" in name_lower or "what u hear" in name_lower:
+                if dev["max_input_channels"] > 0 and dev["hostapi"] in (0, 1, 2):  # MME, DirectSound, WASAPI only
+                    log(f"Using stereo mix device: {dev['name']} (idx {idx})")
+                    return idx
 
-        if wasapi_idx is None:
-            log("WASAPI host API not found")
-            return None
+        # 2. Fall back to default input device (microphone)
+        default_device = sd.default.device[0]
+        if default_device is not None and default_device >= 0:
+            dev = devices[default_device]
+            if dev["max_input_channels"] > 0:
+                log(f"Using default input device: {dev['name']} (idx {default_device})")
+                return default_device
 
-        # Find WASAPI output devices (loopback candidates)
-        wasapi_devices = [
-            (idx, dev)
-            for idx, dev in enumerate(devices)
-            if dev['hostapi'] == wasapi_idx and dev['max_output_channels'] > 0
-        ]
-
-        if not wasapi_devices:
-            log("No WASAPI output devices found for loopback")
-            return None
-
-        # Prefer the default output device if it's WASAPI
-        default_device = sd.default.device[1]  # default output
-        for idx, dev in wasapi_devices:
-            if idx == default_device:
-                log(f"Using default WASAPI loopback device: {dev['name']} (idx {idx})")
+        # 3. Last resort: any input device on MME/DirectSound/WASAPI
+        for idx, dev in enumerate(devices):
+            if dev["max_input_channels"] > 0 and dev["hostapi"] in (0, 1, 2):
+                log(f"Using input device: {dev['name']} (idx {idx})")
                 return idx
 
-        # Fall back to first WASAPI output device
-        idx, dev = wasapi_devices[0]
-        log(f"Using WASAPI loopback device: {dev['name']} (idx {idx})")
-        return idx
+        log("No input device found")
+        return None
 
     except Exception as exc:
-        log(f"Error finding WASAPI loopback device: {exc}")
+        log(f"Error finding loopback device: {exc}")
         return None
 
 
@@ -99,25 +92,27 @@ def find_wasapi_loopback_device() -> int | None:
 # ---------------------------------------------------------------------------
 class AudioCapture:
     def __init__(self):
-        self.stream: sd.InputStream | None = None
+        self.stream: sd.RawInputStream | None = None
         self.running = False
         self.device_index: int | None = None
+        self._audio_buffer: list[np.ndarray] = []
+        self._buffer_lock = threading.Lock()
 
     def start(self) -> bool:
-        """Start the WASAPI loopback capture stream."""
+        """Start the audio capture stream."""
         self.device_index = find_wasapi_loopback_device()
         if self.device_index is None:
-            send_json({"type": "error", "message": "No WASAPI loopback device found"})
+            send_json({"type": "error", "message": "No audio capture device found"})
             return False
 
         try:
-            self.stream = sd.InputStream(
+            # Usar RawInputStream com callback (non-blocking) para compatibilidade WDM-KS
+            self.stream = sd.RawInputStream(
                 device=self.device_index,
                 samplerate=SAMPLE_RATE,
                 channels=CHANNELS,
                 dtype=DTYPE,
                 blocksize=BLOCK_SIZE,
-                extra_settings=sd.WasapiSettings(loopback=True),
                 callback=self._audio_callback,
             )
             self.stream.start()
@@ -141,6 +136,7 @@ class AudioCapture:
                 log(f"Error stopping stream: {exc}")
         self.stream = None
         self.running = False
+        self._audio_buffer.clear()
         log("Audio capture stopped")
         send_json({"type": "status", "status": "stopped"})
 
@@ -153,6 +149,10 @@ class AudioCapture:
         rms = compute_rms(indata)
         if rms < ENERGY_THRESHOLD:
             return  # silence — skip sending
+
+        # Store in buffer for processing thread
+        with self._buffer_lock:
+            self._audio_buffer.append(indata.copy())
 
         # Encode as base64
         audio_bytes = indata.tobytes()
